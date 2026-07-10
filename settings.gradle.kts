@@ -20,4 +20,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "MCQ Quiz App"
-include(":app")
+include(":app", ":domain", ":data", ":feature:quiz")
