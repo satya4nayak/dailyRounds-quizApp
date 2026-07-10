@@ -1,1 +1,8 @@
 /build
+/release
+*.apk
+*.aab
+# ProGuard / R8 mapping files (contain symbol info — keep out of VCS)
+mapping.txt
+seeds.txt
+usage.txt

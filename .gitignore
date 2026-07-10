@@ -1,0 +1,100 @@
+##########################
+# Android / Gradle
+##########################
+
+# Local configuration — contains SDK path & secrets, never commit
+local.properties
+
+# Gradle build outputs and caches
+.gradle/
+build/
+**/build/
+
+# Gradle wrapper jar (optional — uncomment if you prefer to track it)
+# !gradle/wrapper/gradle-wrapper.jar
+
+# Generated APKs / AABs
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Android Studio profiling / captures
+captures/
+
+##########################
+# IntelliJ IDEA / Android Studio
+##########################
+
+# IDE project files (user-specific)
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Android Studio navgraph cache
+.navigation/
+
+##########################
+# Kotlin / Java
+##########################
+
+# Compiled class files
+*.class
+
+# Log files
+*.log
+
+# Package / distribution files
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+##########################
+# Keystore / signing
+##########################
+*.jks
+*.keystore
+keystore.properties
+release.properties
+
+##########################
+# OS-generated files
+##########################
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+##########################
+# Misc
+##########################
+
+# Environment / secrets
+.env
+*.env.*
+secrets.properties
+
+# Crashlytics / Google Services (google-services.json contains API keys)
+# Uncomment the line below if you store google-services.json outside VCS
+# google-services.json
+
+# Coverage / test reports
+**/test-results/
+**/test-report/
+
