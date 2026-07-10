@@ -21,19 +21,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.assignment.mcqquiz.feature.quiz.state.QuizUiState
-import com.assignment.mcqquiz.feature.quiz.ui.component.FireOverlay
+import com.assignment.mcqquiz.feature.quiz.domain.state.QuizUiState
+import com.assignment.mcqquiz.feature.quiz.ui.component.StreakCelebrationOverlay
 import com.assignment.mcqquiz.feature.quiz.ui.component.OptionCard
 import com.assignment.mcqquiz.feature.quiz.ui.component.QuizProgressBar
 import com.assignment.mcqquiz.feature.quiz.ui.component.StreakBadge
+import com.assignment.mcqquiz.feature.quiz.ui.viewmodel.QuizViewModel
 import com.assignment.mcqquiz.feature.quiz.ui.theme.Surface
 
+/**
+ * Main quiz screen displaying the current question, answer options,
+ * progress indicator, streak badge, and skip button.
+ *
+ * Fully stateless — receives [QuizUiState] and emits [QuizViewModel.Event]s upward.
+ */
 @Composable
 fun QuizScreen(
     state: QuizUiState,
-    onOptionSelected: (Int) -> Unit,
-    onSkip: () -> Unit,
-    onStreakCelebrationDismissed: () -> Unit
+    onEvent: (QuizViewModel.Event) -> Unit
 ) {
     if (state.questions.isEmpty()) return
 
@@ -48,7 +53,6 @@ fun QuizScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Progress bar
             QuizProgressBar(
                 currentIndex = state.currentIndex,
                 totalQuestions = state.questions.size
@@ -56,7 +60,6 @@ fun QuizScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Question counter
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -71,7 +74,6 @@ fun QuizScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Question card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Surface),
@@ -87,7 +89,6 @@ fun QuizScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Options
             currentQuestion.options.forEachIndexed { index, option ->
                 OptionCard(
                     optionText = option,
@@ -95,19 +96,18 @@ fun QuizScreen(
                     selectedOptionIndex = state.selectedOptionIndex,
                     correctOptionIndex = currentQuestion.correctOptionIndex,
                     isAnswerRevealed = state.isAnswerRevealed,
-                    onClick = onOptionSelected
+                    onClick = { onEvent(QuizViewModel.Event.OptionSelected(it)) }
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Skip button
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
                 TextButton(
-                    onClick = onSkip,
+                    onClick = { onEvent(QuizViewModel.Event.SkipQuestion) },
                     enabled = !state.isAnswerRevealed
                 ) {
                     Text(
@@ -120,13 +120,11 @@ fun QuizScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // Fire overlay
         if (state.showStreakCelebration) {
-            FireOverlay(
+            StreakCelebrationOverlay(
                 streakCount = state.currentStreak,
-                onDismiss = onStreakCelebrationDismissed
+                onDismiss = { onEvent(QuizViewModel.Event.StreakCelebrationDismissed) }
             )
         }
     }
 }
-

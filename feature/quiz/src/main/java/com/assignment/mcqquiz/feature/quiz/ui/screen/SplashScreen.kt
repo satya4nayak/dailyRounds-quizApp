@@ -16,6 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * Loading screen shown while questions are being fetched.
+ * Stateless — no events needed.
+ */
 @Composable
 fun SplashScreen() {
     Column(
@@ -25,10 +29,7 @@ fun SplashScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "🧠",
-            fontSize = 72.sp
-        )
+        Text(text = "🧠", fontSize = 72.sp)
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -49,9 +50,6 @@ fun SplashScreen() {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        CircularProgressIndicator(
-            color = MaterialTheme.colorScheme.primary
-        )
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
     }
 }
-

@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.kapt)
+    // serialization removed — QuestionDto now lives in :data
 }
 
 android {
@@ -27,9 +28,10 @@ android {
 }
 
 dependencies {
-    implementation(project(":domain"))
+    // :data provides domain models, QuizService interface, infra (no serialization needed here)
+    implementation(project(":data"))
 
-    // Compose BOM
+    // ── Compose BOM ──────────────────────────────────────────────────────────
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     implementation(libs.compose.ui)
@@ -39,19 +41,18 @@ dependencies {
     implementation(libs.compose.animation)
     debugImplementation(libs.compose.ui.tooling)
 
-    // Lifecycle
+    // ── Lifecycle / ViewModel ────────────────────────────────────────────────
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.ktx)
 
-    // Coroutines
+    // ── Coroutines ───────────────────────────────────────────────────────────
     implementation(libs.kotlinx.coroutines.android)
 
-    // Dagger
+    // ── Dagger (pure — no Hilt) ──────────────────────────────────────────────
     implementation(libs.dagger)
     kapt(libs.dagger.compiler)
 
-    // Lottie
+    // ── Lottie (streak celebration overlay) ─────────────────────────────────
     implementation(libs.lottie.compose)
 }
-

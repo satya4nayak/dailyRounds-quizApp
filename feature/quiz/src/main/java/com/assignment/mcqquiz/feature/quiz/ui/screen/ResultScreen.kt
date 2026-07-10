@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -29,21 +28,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.assignment.mcqquiz.feature.quiz.state.QuizUiState
+import com.assignment.mcqquiz.feature.quiz.domain.state.QuizUiState
+import com.assignment.mcqquiz.feature.quiz.ui.viewmodel.QuizViewModel
 import com.assignment.mcqquiz.feature.quiz.ui.theme.CorrectGreen
 import com.assignment.mcqquiz.feature.quiz.ui.theme.Primary
 import com.assignment.mcqquiz.feature.quiz.ui.theme.Surface
 import kotlinx.coroutines.delay
 
+/**
+ * Results screen displayed after the last question is answered.
+ *
+ * Shows animated score counter, a stat summary card (correct/skipped/streak),
+ * and a restart button. Fully stateless — events flow up via [onEvent].
+ */
 @Composable
 fun ResultScreen(
     state: QuizUiState,
-    onRestart: () -> Unit
+    onEvent: (QuizViewModel.Event) -> Unit
 ) {
     val total = state.questions.size
     var displayedCount by remember { mutableIntStateOf(0) }
@@ -57,7 +62,7 @@ fun ResultScreen(
     }
 
     val progress = if (total > 0) state.correctCount.toFloat() / total else 0f
-    val isGreat = state.correctCount >= total / 2
+    val isGreatScore = state.correctCount >= total / 2
 
     Column(
         modifier = Modifier
@@ -67,7 +72,7 @@ fun ResultScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = if (isGreat) "Congratulations! 🎉" else "Quiz Complete!",
+            text = if (isGreatScore) "Congratulations! 🎉" else "Quiz Complete!",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             fontSize = 28.sp,
@@ -76,7 +81,7 @@ fun ResultScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Score ring
+        // Animated score ring
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(160.dp)
@@ -96,34 +101,31 @@ fun ResultScreen(
                     fontWeight = FontWeight.Bold,
                     color = CorrectGreen
                 )
-                Text(
-                    text = "/ $total",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Text(text = "/ $total", style = MaterialTheme.typography.bodyMedium)
             }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Stats card
+        // Stats summary card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Surface),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                ResultRow(label = "✅ Correct Answers", value = "${state.correctCount} / $total")
+                ResultStatRow(label = "✅ Correct Answers", value = "${state.correctCount} / $total")
                 Spacer(modifier = Modifier.height(12.dp))
-                ResultRow(label = "⏭️ Skipped", value = "${state.skippedCount}")
+                ResultStatRow(label = "⏭️ Skipped", value = "${state.skippedCount}")
                 Spacer(modifier = Modifier.height(12.dp))
-                ResultRow(label = "🔥 Longest Streak", value = "${state.longestStreak}")
+                ResultStatRow(label = "🔥 Longest Streak", value = "${state.longestStreak}")
             }
         }
 
         Spacer(modifier = Modifier.height(40.dp))
 
         Button(
-            onClick = onRestart,
+            onClick = { onEvent(QuizViewModel.Event.RestartQuiz) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -141,16 +143,13 @@ fun ResultScreen(
 }
 
 @Composable
-private fun ResultRow(label: String, value: String) {
+private fun ResultStatRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge
-        )
+        Text(text = label, style = MaterialTheme.typography.bodyLarge)
         Text(
             text = value,
             style = MaterialTheme.typography.bodyLarge,
@@ -159,4 +158,3 @@ private fun ResultRow(label: String, value: String) {
         )
     }
 }
-

@@ -23,10 +23,13 @@ android {
 }
 
 dependencies {
-    implementation(project(":domain"))
-
+    // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+
+    // Serialization (QuestionDto)
     implementation(libs.kotlinx.serialization.json)
+
+    // Dagger — pure, no Hilt
     implementation(libs.dagger)
     kapt(libs.dagger.compiler)
 }
