@@ -44,10 +44,9 @@ import com.assignment.mcqquiz.feature.quiz.ui.theme.TextSecondary
 
 /**
  * Loading screen shown while questions are being fetched.
- * Stateless — no events needed.
  */
 @Composable
-fun SplashScreen() {
+fun NetworkLoaderScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -96,8 +95,8 @@ fun SplashScreen() {
 
             // ── Info pills ────────────────────────────────────────
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SplashPill(text = "10 Questions")
-                SplashPill(text = "~2 Minutes")
+                NetworkLoaderPill(text = "10 Questions")
+                NetworkLoaderPill(text = "~2 Minutes")
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -118,7 +117,7 @@ fun SplashScreen() {
 }
 
 @Composable
-private fun SplashPill(text: String) {
+private fun NetworkLoaderPill(text: String) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(99.dp))
@@ -193,6 +192,6 @@ private fun AnimatedLoadingDots() {
 @Composable
 private fun SplashScreenPreview() {
     QuizAppTheme {
-        SplashScreen()
+        NetworkLoaderScreen()
     }
 }

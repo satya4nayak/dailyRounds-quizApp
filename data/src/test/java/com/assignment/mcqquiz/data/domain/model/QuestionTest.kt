@@ -16,7 +16,7 @@ class QuestionTest {
 
     private val sampleQuestion = Question(
         id = 1,
-        text = "What is the capital of France?",
+        question = "What is the capital of France?",
         options = listOf("Berlin", "Madrid", "Paris", "Rome"),
         correctOptionIndex = 2
     )
@@ -30,7 +30,7 @@ class QuestionTest {
 
     @Test
     fun `given a question, when text is accessed, then correct text is returned`() {
-        assertEquals("What is the capital of France?", sampleQuestion.text)
+        assertEquals("What is the capital of France?", sampleQuestion.question)
     }
 
     @Test
@@ -54,7 +54,7 @@ class QuestionTest {
     fun `given two questions with identical fields, when compared, then they are equal`() {
         val duplicate = Question(
             id = 1,
-            text = "What is the capital of France?",
+            question = "What is the capital of France?",
             options = listOf("Berlin", "Madrid", "Paris", "Rome"),
             correctOptionIndex = 2
         )
@@ -69,8 +69,8 @@ class QuestionTest {
 
     @Test
     fun `given a question, when copied with new text, then only text changes`() {
-        val copied = sampleQuestion.copy(text = "Updated question?")
-        assertEquals("Updated question?", copied.text)
+        val copied = sampleQuestion.copy(question = "Updated question?")
+        assertEquals("Updated question?", copied.question)
         assertEquals(sampleQuestion.id, copied.id)
         assertEquals(sampleQuestion.options, copied.options)
         assertEquals(sampleQuestion.correctOptionIndex, copied.correctOptionIndex)
@@ -78,13 +78,13 @@ class QuestionTest {
 
     @Test
     fun `given a question with correctOptionIndex 0, when checking first option, then it is the correct answer`() {
-        val q = Question(id = 2, text = "Q?", options = listOf("A", "B", "C", "D"), correctOptionIndex = 0)
+        val q = Question(id = 2, question = "Q?", options = listOf("A", "B", "C", "D"), correctOptionIndex = 0)
         assertEquals("A", q.options[q.correctOptionIndex])
     }
 
     @Test
     fun `given a question with correctOptionIndex 3, when checking last option, then it is the correct answer`() {
-        val q = Question(id = 3, text = "Q?", options = listOf("A", "B", "C", "D"), correctOptionIndex = 3)
+        val q = Question(id = 3, question = "Q?", options = listOf("A", "B", "C", "D"), correctOptionIndex = 3)
         assertEquals("D", q.options[q.correctOptionIndex])
     }
 
@@ -92,19 +92,19 @@ class QuestionTest {
 
     @Test
     fun `given a question with empty text, when created, then it stores empty string`() {
-        val q = Question(id = 4, text = "", options = listOf("A"), correctOptionIndex = 0)
-        assertEquals("", q.text)
+        val q = Question(id = 4, question = "", options = listOf("A"), correctOptionIndex = 0)
+        assertEquals("", q.question)
     }
 
     @Test
     fun `given a question with single option, when created, then options size is one`() {
-        val q = Question(id = 5, text = "Q?", options = listOf("Only option"), correctOptionIndex = 0)
+        val q = Question(id = 5, question = "Q?", options = listOf("Only option"), correctOptionIndex = 0)
         assertEquals(1, q.options.size)
     }
 
     @Test
     fun `given a question with empty options list, when created, then options is empty`() {
-        val q = Question(id = 6, text = "Q?", options = emptyList(), correctOptionIndex = 0)
+        val q = Question(id = 6, question = "Q?", options = emptyList(), correctOptionIndex = 0)
         assertEquals(emptyList<String>(), q.options)
     }
 }

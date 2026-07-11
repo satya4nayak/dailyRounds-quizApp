@@ -4,16 +4,16 @@ import com.assignment.mcqquiz.data.infra.dto.QuestionDto
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Mock API service that simulates a remote quiz data source.
  * The 1-second delay simulates network latency.
- * Replace with a Retrofit/Ktor client for production use.
  */
 class QuestionApiService @Inject constructor() : QuestionApiClient {
 
     override suspend fun fetchQuestions(): List<QuestionDto> {
-        delay(1_000L)
+        delay(API_CALL_DELAY)
         return Json.decodeFromString(QUESTIONS_JSON)
     }
 
@@ -31,5 +31,6 @@ class QuestionApiService @Inject constructor() : QuestionApiClient {
   {"id":10,"question":"Which Android system option helps developers visualize screen redraws and UI jank during testing?","options":["Show GPU overdraw","System WebView debug","Location simulator","Enable dark theme"],"correctOptionIndex":0}
 ]"""
     }
+    private val API_CALL_DELAY = 1_000L.milliseconds
 }
 

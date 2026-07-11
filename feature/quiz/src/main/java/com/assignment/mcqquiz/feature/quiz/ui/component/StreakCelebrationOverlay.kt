@@ -31,9 +31,6 @@ private val VISIBLE_DURATION = 3_000L.milliseconds
 
 /**
  * Full-screen overlay celebrating a streak milestone (every 3 correct in a row).
- *
- * Appears after a 1-second delay, stays visible for 1.5 seconds, then auto-dismisses.
- * Can also be dismissed immediately by tapping the backdrop.
  */
 @Composable
 fun StreakCelebrationOverlay(

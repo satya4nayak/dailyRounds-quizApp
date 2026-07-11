@@ -4,7 +4,6 @@ import app.cash.turbine.test
 import com.assignment.mcqquiz.data.domain.model.Question
 import com.assignment.mcqquiz.data.domain.service.QuizService
 import com.assignment.mcqquiz.feature.quiz.domain.contract.QuizAppContract
-import com.assignment.mcqquiz.feature.quiz.domain.state.QuizUiState
 import com.assignment.mcqquiz.feature.quiz.util.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -60,7 +59,7 @@ class QuizViewModelTest {
     ): List<Question> = (0 until count).map { i ->
         Question(
             id = i + 1,
-            text = "Question ${i + 1}",
+            question = "Question ${i + 1}",
             options = listOf("Option A", "Option B", "Option C", "Option D"),
             correctOptionIndex = if (i in alternateCorrectAt) 1 else 0
         )
@@ -163,7 +162,7 @@ class QuizViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            assertEquals(0, viewModel.uiState.value.currentIndex)
+            assertEquals(0, viewModel.uiState.value.currentQuestionIndex)
         }
 
     // ─── Loading failure ──────────────────────────────────────────────────────
@@ -241,6 +240,8 @@ class QuizViewModelTest {
 
     @Before
     fun setUp() {
+        // Reset the cross-session streak counter so each test starts clean.
+        QuizViewModel.resetAllTimeLongestStreakForTest()
         // Default stub — can be overridden per test
         coEvery { quizService.loadQuestions() } returns buildQuestions()
     }
@@ -379,27 +380,101 @@ class QuizViewModelTest {
         }
 
     // =========================================================================
-    // 5. Streak Milestones
+    // 5. Streak Milestones & Auto-Dismiss
+    //
+    // Celebration shows for any streak >= 3 (not just multiples of 3).
+    // The ViewModel owns both showing AND dismissing: after 1 500 ms it sets
+    // showStreakCelebration = false, then the remaining 500 ms elapse before
+    // advancing to the next question (2 000 ms total — same as the no-
+    // celebration path).  No StreakCelebrationDismissed event exists any more.
     // =========================================================================
 
     @Test
-    fun `given 3 consecutive correct answers, when third correct option is selected, then showStreakCelebration is true`() =
+    fun `given 2 correct answers already, when third correct option selected, then showStreakCelebration is immediately true`() =
         runTest(mainDispatcherRule.testScheduler) {
             coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            // Answer 3 questions correctly, advancing after each
-            repeat(3) {
+            // Reach Q3 with a running streak of 2
+            repeat(2) {
                 viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-                advanceTimeBy(2_001L) // auto-advance fires
+                advanceTimeBy(2_001L)
                 advanceUntilIdle()
             }
 
-            // After the 3rd correct answer the celebration flag should have been set true
-            // The state just before auto-advance fires contains showStreakCelebration = true
-            // We verify the streak was reached by checking longestStreak
-            assertEquals(3, viewModel.uiState.value.longestStreak)
+            // Third correct answer (streak = 3) — celebration must appear immediately
+            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
+
+            assertTrue(viewModel.uiState.value.showStreakCelebration)
+            assertEquals(3, viewModel.uiState.value.currentStreak)
+        }
+
+    @Test
+    fun `given streak celebration showing, when 1500ms pass, then ViewModel auto-dismisses showStreakCelebration`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            repeat(2) {
+                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L)
+                advanceUntilIdle()
+            }
+            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0)) // streak = 3, celebration starts
+
+            assertTrue(viewModel.uiState.value.showStreakCelebration)
+
+            // Auto-dismiss fires at exactly STREAK_CELEBRATION_DISMISS_MS = 1 500 ms
+            advanceTimeBy(1_500L)
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.showStreakCelebration)
+        }
+
+    @Test
+    fun `given streak celebration showing, when 2 seconds pass, then question advances and celebration is cleared`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            repeat(2) {
+                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L)
+                advanceUntilIdle()
+            }
+            // Q3, streak = 3
+            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            val indexBeforeAdvance = viewModel.uiState.value.currentQuestionIndex
+
+            advanceTimeBy(2_001L)  // 1 500 ms dismiss + 500 ms remaining → advance
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.showStreakCelebration)
+            assertEquals(indexBeforeAdvance + 1, viewModel.uiState.value.currentQuestionIndex)
+        }
+
+    @Test
+    fun `given streak already at 3, when fourth correct option selected, then showStreakCelebration is true again`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            // Build streak of 3 and let the question advance
+            repeat(3) {
+                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L)
+                advanceUntilIdle()
+            }
+
+            // Streak is still 3 after advancing; 4th correct answer keeps >= 3
+            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
+
+            assertTrue(viewModel.uiState.value.showStreakCelebration)
+            assertEquals(4, viewModel.uiState.value.currentStreak)
         }
 
     @Test
@@ -409,41 +484,18 @@ class QuizViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            // First correct answer
+            // First correct answer — streak = 1 (below threshold)
             viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            // Capture state immediately (before auto-advance)
             assertFalse(viewModel.uiState.value.showStreakCelebration)
             assertEquals(1, viewModel.uiState.value.currentStreak)
 
             advanceTimeBy(2_001L)
             advanceUntilIdle()
 
-            // Second correct answer
+            // Second correct answer — streak = 2 (still below threshold)
             viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
             assertFalse(viewModel.uiState.value.showStreakCelebration)
             assertEquals(2, viewModel.uiState.value.currentStreak)
-        }
-
-    @Test
-    fun `given streak celebration is showing, when StreakCelebrationDismissed event fired, then showStreakCelebration becomes false`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            // Build streak to 3 (triggers celebration)
-            repeat(2) {
-                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-                advanceTimeBy(2_001L)
-                advanceUntilIdle()
-            }
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0)) // streak = 3
-
-            assertTrue(viewModel.uiState.value.showStreakCelebration)
-
-            viewModel.handleEvent(QuizViewModel.Event.StreakCelebrationDismissed)
-
-            assertFalse(viewModel.uiState.value.showStreakCelebration)
         }
 
     @Test
@@ -453,7 +505,6 @@ class QuizViewModelTest {
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            // Build streak of 3
             repeat(3) {
                 viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
                 advanceTimeBy(2_001L)
@@ -461,7 +512,6 @@ class QuizViewModelTest {
             }
             assertEquals(3, viewModel.uiState.value.longestStreak)
 
-            // Now answer incorrectly
             viewModel.handleEvent(QuizViewModel.Event.OptionSelected(3)) // wrong
             assertEquals(0, viewModel.uiState.value.currentStreak)
         }
@@ -507,7 +557,7 @@ class QuizViewModelTest {
 
             viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
 
-            assertEquals(1, viewModel.uiState.value.currentIndex)
+            assertEquals(1, viewModel.uiState.value.currentQuestionIndex)
         }
 
     @Test
@@ -573,7 +623,7 @@ class QuizViewModelTest {
             viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
 
             assertEquals(3, viewModel.uiState.value.skippedCount)
-            assertEquals(3, viewModel.uiState.value.currentIndex)
+            assertEquals(3, viewModel.uiState.value.currentQuestionIndex)
         }
 
     // =========================================================================
@@ -588,12 +638,12 @@ class QuizViewModelTest {
             advanceUntilIdle()
 
             viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0)) // correct
-            assertEquals(0, viewModel.uiState.value.currentIndex) // still on Q1
+            assertEquals(0, viewModel.uiState.value.currentQuestionIndex) // still on Q1
 
             advanceTimeBy(2_001L) // past the 2-second delay
             advanceUntilIdle()
 
-            assertEquals(1, viewModel.uiState.value.currentIndex)
+            assertEquals(1, viewModel.uiState.value.currentQuestionIndex)
         }
 
     @Test
@@ -604,12 +654,12 @@ class QuizViewModelTest {
             advanceUntilIdle()
 
             viewModel.handleEvent(QuizViewModel.Event.OptionSelected(3)) // wrong
-            assertEquals(0, viewModel.uiState.value.currentIndex)
+            assertEquals(0, viewModel.uiState.value.currentQuestionIndex)
 
             advanceTimeBy(2_001L)
             advanceUntilIdle()
 
-            assertEquals(1, viewModel.uiState.value.currentIndex)
+            assertEquals(1, viewModel.uiState.value.currentQuestionIndex)
         }
 
     @Test
@@ -671,14 +721,14 @@ class QuizViewModelTest {
 
             // Skip before 2 seconds — cancels the timer and advances immediately
             viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
-            assertEquals(1, viewModel.uiState.value.currentIndex)
+            assertEquals(1, viewModel.uiState.value.currentQuestionIndex)
 
             // Advancing past the original 2-second delay — the cancelled job must NOT fire
             advanceTimeBy(2_001L)
             advanceUntilIdle()
 
             // Index stays at 1: the skip advanced once; the cancelled auto-advance does NOT fire again
-            assertEquals(1, viewModel.uiState.value.currentIndex)
+            assertEquals(1, viewModel.uiState.value.currentQuestionIndex)
         }
 
     // =========================================================================
@@ -715,83 +765,125 @@ class QuizViewModelTest {
         }
 
     // =========================================================================
-    // 9. Restart Quiz
+    // 9. Restart Quiz — finish-and-restart via Effect
+    //
+    // onRestart() no longer resets state in-place. Instead it:
+    //  1. Saves the session's longestStreak into allTimeLongestStreak (companion) — synchronously.
+    //  2. Launches a coroutine that calls _effects.emit(Effect.RestartApp) — asynchronously.
+    //     advanceUntilIdle() is required after firing RestartQuiz so the launched
+    //     coroutine runs and delivers the effect before awaitItem() is called.
+    // A fresh ViewModel then picks up allTimeLongestStreak in loadQuestions().
     // =========================================================================
 
     @Test
-    fun `given quiz in progress, when RestartQuiz event fired, then state resets to default`() =
+    fun `given quiz in progress, when RestartQuiz event fired, then Effect RestartApp is emitted`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions()
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            // Progress through a few questions
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            advanceTimeBy(2_001L)
-            advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
+            viewModel.effects.test {
+                viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
+                advanceUntilIdle() // drive the viewModelScope.launch { emit(...) } coroutine
 
-            // Restart
-            viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
+                val effect = awaitItem()
+                assertTrue(effect is QuizViewModel.Effect.RestartApp)
 
-            // State should be reset (loading)
-            assertEquals(0, viewModel.uiState.value.currentIndex)
-            assertEquals(0, viewModel.uiState.value.correctCount)
-            assertEquals(0, viewModel.uiState.value.skippedCount)
-            assertEquals(0, viewModel.uiState.value.currentStreak)
-            assertTrue(viewModel.uiState.value.isLoading)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 
     @Test
-    fun `given quiz on Results screen, when RestartQuiz event fired, then questions reload and screen returns to Quiz`() =
+    fun `given quiz with longestStreak 4, when RestartQuiz event fired, then allTimeLongestStreak is updated`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            // Build a streak of 4
+            repeat(4) {
+                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L)
+                advanceUntilIdle()
+            }
+            assertEquals(4, viewModel.uiState.value.longestStreak)
+
+            viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
+
+            assertEquals(4, QuizViewModel.allTimeLongestStreak)
+        }
+
+    @Test
+    fun `given prior allTimeLongestStreak of 5, when new questions load, then longestStreak starts at 5`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            // Simulate a prior session that achieved streak 5
+            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
+            val firstVm = createViewModel()
+            advanceUntilIdle()
+            repeat(5) {
+                firstVm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L)
+                advanceUntilIdle()
+            }
+            firstVm.handleEvent(QuizViewModel.Event.RestartQuiz)
+            assertEquals(5, QuizViewModel.allTimeLongestStreak)
+
+            // New ViewModel (simulates Activity restart)
+            val newVm = createViewModel()
+            advanceUntilIdle()
+
+            assertEquals(5, newVm.uiState.value.longestStreak)
+        }
+
+    @Test
+    fun `given current session longestStreak 3 and prior allTimeLongestStreak 5, when RestartQuiz fired, then allTimeLongestStreak stays 5`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            // Seed a prior high of 5
+            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
+            val firstVm = createViewModel()
+            advanceUntilIdle()
+            repeat(5) {
+                firstVm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L)
+                advanceUntilIdle()
+            }
+            firstVm.handleEvent(QuizViewModel.Event.RestartQuiz)
+
+            // New session — achieve only streak 3
+            val secondVm = createViewModel()
+            advanceUntilIdle()
+            repeat(3) {
+                secondVm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L)
+                advanceUntilIdle()
+            }
+            secondVm.handleEvent(QuizViewModel.Event.RestartQuiz)
+
+            // The all-time high should remain 5, not drop to 3
+            assertEquals(5, QuizViewModel.allTimeLongestStreak)
+        }
+
+    @Test
+    fun `given quiz on Results screen, when RestartQuiz event fired, then Effect RestartApp is emitted`() =
         runTest(mainDispatcherRule.testScheduler) {
             coEvery { quizService.loadQuestions() } returns buildQuestions(count = 1)
             val viewModel = createViewModel()
             advanceUntilIdle()
 
-            // Complete quiz
+            // Complete the quiz to reach Results screen
             viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
             advanceTimeBy(2_001L)
             advanceUntilIdle()
             assertEquals(QuizAppContract.Results, viewModel.uiState.value.screen)
 
-            // Restart and let loading complete
-            viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
-            advanceUntilIdle()
+            viewModel.effects.test {
+                viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
+                advanceUntilIdle() // drive the viewModelScope.launch { emit(...) } coroutine
 
-            assertEquals(QuizAppContract.Quiz, viewModel.uiState.value.screen)
-            assertFalse(viewModel.uiState.value.isLoading)
-        }
+                val effect = awaitItem()
+                assertTrue(effect is QuizViewModel.Effect.RestartApp)
 
-    @Test
-    fun `given quiz restarted, when reload succeeds, then quizService is called twice in total`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions()
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
-            advanceUntilIdle()
-
-            coVerify(exactly = 2) { quizService.loadQuestions() }
-        }
-
-    @Test
-    fun `given quiz restarted after error, when reload succeeds, then screen transitions to Quiz`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            // First load fails
-            coEvery { quizService.loadQuestions() } throws RuntimeException("Initial failure")
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-
-            assertEquals(QuizAppContract.Splash, viewModel.uiState.value.screen)
-
-            // Second load succeeds
-            coEvery { quizService.loadQuestions() } returns buildQuestions()
-            viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
-            advanceUntilIdle()
-
-            assertEquals(QuizAppContract.Quiz, viewModel.uiState.value.screen)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 
     // =========================================================================
@@ -815,7 +907,7 @@ class QuizViewModelTest {
                 val loaded = awaitItem()
                 assertFalse(loaded.isLoading)
                 assertEquals(QuizAppContract.Quiz, loaded.screen)
-                assertEquals(0, loaded.currentIndex)
+                assertEquals(0, loaded.currentQuestionIndex)
 
                 // 3. Answer Q1 correctly
                 viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
@@ -828,7 +920,7 @@ class QuizViewModelTest {
                 advanceTimeBy(2_001L)
                 advanceUntilIdle()
                 val q2 = awaitItem()
-                assertEquals(1, q2.currentIndex)
+                assertEquals(1, q2.currentQuestionIndex)
                 assertFalse(q2.isAnswerRevealed)
                 assertNull(q2.selectedOptionIndex)
 
@@ -850,25 +942,26 @@ class QuizViewModelTest {
         }
 
     // =========================================================================
-    // 11. Effects SharedFlow — Error only emitted once per load failure
+    // 11. Effects SharedFlow — correct effect sequence
     // =========================================================================
 
     @Test
-    fun `given quiz service always throws, when RestartQuiz is fired, then a new error effect is emitted`() =
+    fun `given quiz service throws, when load fails and RestartQuiz is fired, then error effect then RestartApp effect are emitted in order`() =
         runTest(mainDispatcherRule.testScheduler) {
             coEvery { quizService.loadQuestions() } throws RuntimeException("Always fails")
             val viewModel = createViewModel()
 
             viewModel.effects.test {
-                advanceUntilIdle() // first load fails
+                advanceUntilIdle() // first load fails → ShowQuestionLoadError (tryEmit, synchronous)
+
                 val firstEffect = awaitItem()
                 assertTrue(firstEffect is QuizViewModel.Effect.ShowQuestionLoadError)
 
                 viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
-                advanceUntilIdle() // second load fails
+                advanceUntilIdle() // drive the viewModelScope.launch { emit(...) } coroutine
 
                 val secondEffect = awaitItem()
-                assertTrue(secondEffect is QuizViewModel.Effect.ShowQuestionLoadError)
+                assertTrue(secondEffect is QuizViewModel.Effect.RestartApp)
 
                 cancelAndIgnoreRemainingEvents()
             }

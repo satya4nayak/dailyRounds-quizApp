@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -25,8 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.assignment.mcqquiz.data.domain.model.Question
 import com.assignment.mcqquiz.feature.quiz.domain.state.QuizUiState
 import com.assignment.mcqquiz.feature.quiz.ui.component.OptionCard
 import com.assignment.mcqquiz.feature.quiz.ui.component.QuizProgressBar
@@ -42,9 +42,6 @@ import com.assignment.mcqquiz.feature.quiz.ui.theme.SurfaceHi
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextPrimary
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextSecondary
 import com.assignment.mcqquiz.feature.quiz.ui.theme.WrongRed
-import com.assignment.mcqquiz.feature.quiz.ui.viewmodel.QuizViewModel
-import androidx.compose.ui.tooling.preview.Preview
-import com.assignment.mcqquiz.data.domain.model.Question
 import com.assignment.mcqquiz.feature.quiz.ui.theme.QuizAppTheme
 
 /**
@@ -56,11 +53,12 @@ import com.assignment.mcqquiz.feature.quiz.ui.theme.QuizAppTheme
 @Composable
 fun QuizScreen(
     state: QuizUiState,
-    onEvent: (QuizViewModel.Event) -> Unit
+    onOptionSelected: (Int) -> Unit,
+    onSkip: () -> Unit
 ) {
     if (state.questions.isEmpty()) return
 
-    val currentQuestion = state.questions[state.currentIndex]
+    val currentQuestion = state.questions[state.currentQuestionIndex]
     val total = state.questions.size
 
     Box(
@@ -91,7 +89,7 @@ fun QuizScreen(
             ) {
                 Row {
                     Text(
-                        text = "${state.currentIndex + 1}",
+                        text = "${state.currentQuestionIndex + 1}",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
@@ -107,38 +105,10 @@ fun QuizScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ── Step dots ─────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally)
-            ) {
-                repeat(total) { index ->
-                    val isActive = index == state.currentIndex
-                    val isDone   = index < state.currentIndex
-                    Box(
-                        modifier = Modifier
-                            .height(6.dp)
-                            .then(
-                                if (isActive) Modifier.width(18.dp)
-                                else Modifier.size(6.dp)
-                            )
-                            .clip(RoundedCornerShape(99.dp))
-                            .background(
-                                when {
-                                    isActive -> Primary
-                                    isDone   -> Primary.copy(alpha = 0.5f)
-                                    else     -> SurfaceHi
-                                }
-                            )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
 
             // ── Progress bar ──────────────────────────────────────
             QuizProgressBar(
-                currentIndex = state.currentIndex,
+                currentIndex = state.currentQuestionIndex,
                 totalQuestions = total
             )
 
@@ -159,7 +129,7 @@ fun QuizScreen(
                         .padding(start = 20.dp, end = 20.dp, top = 25.dp, bottom = 22.dp)
                 ) {
                     Text(
-                        text = "QUESTION ${state.currentIndex + 1}",
+                        text = "QUESTION ${state.currentQuestionIndex + 1}",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Primary,
@@ -167,7 +137,7 @@ fun QuizScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = currentQuestion.text,
+                        text = currentQuestion.question,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary,
@@ -197,7 +167,7 @@ fun QuizScreen(
                         selectedOptionIndex = state.selectedOptionIndex,
                         correctOptionIndex = currentQuestion.correctOptionIndex,
                         isAnswerRevealed = state.isAnswerRevealed,
-                        onClick = { onEvent(QuizViewModel.Event.OptionSelected(it)) }
+                        onClick = onOptionSelected
                     )
                 }
             }
@@ -269,9 +239,7 @@ fun QuizScreen(
                     .clip(RoundedCornerShape(14.dp))
                     .background(SurfaceHi.copy(alpha = skipAlpha))
                     .border(1.5.dp, TextSecondary.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-                    .clickable(enabled = !state.isAnswerRevealed) {
-                        onEvent(QuizViewModel.Event.SkipQuestion)
-                    }
+                    .clickable(enabled = !state.isAnswerRevealed) { onSkip() }
                     .padding(14.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -291,7 +259,7 @@ fun QuizScreen(
         if (state.showStreakCelebration) {
             StreakCelebrationOverlay(
                 streakCount = state.currentStreak,
-                onDismiss = { onEvent(QuizViewModel.Event.StreakCelebrationDismissed) }
+                onDismiss = {}
             )
         }
     }
@@ -306,19 +274,19 @@ fun QuizScreen(
 private val previewQuestions = listOf(
     Question(
         id = 1,
-        text = "What hidden feature do recent Android versions reveal when you tap the version number multiple times in Settings?",
+        question = "What hidden feature do recent Android versions reveal when you tap the version number multiple times in Settings?",
         options = listOf("Flappy Bird-style game", "Virtual pet", "Hidden performance menu", "System UI tuner"),
         correctOptionIndex = 0
     ),
     Question(
         id = 2,
-        text = "If you were to implement 'shake to undo' in your Android app, what's the biggest technical challenge you'd face?",
+        question = "If you were to implement 'shake to undo' in your Android app, what's the biggest technical challenge you'd face?",
         options = listOf("Detecting accidental shakes", "Battery drain due to sensors", "Android doesn't allow motion APIs", "Undo logic is illegal on Android"),
         correctOptionIndex = 0
     ),
     Question(
         id = 3,
-        text = "Which Android system permission is needed to draw a floating overlay on top of other apps?",
+        question = "Which Android system permission is needed to draw a floating overlay on top of other apps?",
         options = listOf("SYSTEM_ALERT_WINDOW", "ACCESS_OVERLAY_UI", "DRAW_OVER_APPS", "FOREGROUND_SERVICE"),
         correctOptionIndex = 0
     )
@@ -330,12 +298,9 @@ private val previewQuestions = listOf(
 private fun QuizScreenPreview_Default() {
     QuizAppTheme {
         QuizScreen(
-            state = QuizUiState(
-                questions = previewQuestions,
-                currentIndex = 0,
-                currentStreak = 0
-            ),
-            onEvent = {}
+            state = QuizUiState(questions = previewQuestions, currentQuestionIndex = 0, currentStreak = 0),
+            onOptionSelected = {},
+            onSkip = {}
         )
     }
 }
@@ -346,14 +311,9 @@ private fun QuizScreenPreview_Default() {
 private fun QuizScreenPreview_CorrectAnswer() {
     QuizAppTheme {
         QuizScreen(
-            state = QuizUiState(
-                questions = previewQuestions,
-                currentIndex = 0,
-                selectedOptionIndex = 0,
-                isAnswerRevealed = true,
-                currentStreak = 1
-            ),
-            onEvent = {}
+            state = QuizUiState(questions = previewQuestions, currentQuestionIndex = 0, selectedOptionIndex = 0, isAnswerRevealed = true, currentStreak = 1),
+            onOptionSelected = {},
+            onSkip = {}
         )
     }
 }
@@ -364,14 +324,9 @@ private fun QuizScreenPreview_CorrectAnswer() {
 private fun QuizScreenPreview_WrongAnswer() {
     QuizAppTheme {
         QuizScreen(
-            state = QuizUiState(
-                questions = previewQuestions,
-                currentIndex = 1,
-                selectedOptionIndex = 2,
-                isAnswerRevealed = true,
-                currentStreak = 0
-            ),
-            onEvent = {}
+            state = QuizUiState(questions = previewQuestions, currentQuestionIndex = 1, selectedOptionIndex = 2, isAnswerRevealed = true, currentStreak = 0),
+            onOptionSelected = {},
+            onSkip = {}
         )
     }
 }
@@ -382,12 +337,9 @@ private fun QuizScreenPreview_WrongAnswer() {
 private fun QuizScreenPreview_ActiveStreak() {
     QuizAppTheme {
         QuizScreen(
-            state = QuizUiState(
-                questions = previewQuestions,
-                currentIndex = 2,
-                currentStreak = 3
-            ),
-            onEvent = {}
+            state = QuizUiState(questions = previewQuestions, currentQuestionIndex = 2, currentStreak = 3),
+            onOptionSelected = {},
+            onSkip = {}
         )
     }
 }

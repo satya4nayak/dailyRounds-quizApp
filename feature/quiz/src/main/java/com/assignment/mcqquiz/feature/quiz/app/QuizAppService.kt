@@ -9,7 +9,6 @@ import com.assignment.mcqquiz.data.infra.repository.QuestionRepository
  *
  * Orchestrates question loading by delegating to [QuestionRepository]
  * and returning clean domain [Question] entities to callers.
- * Future use cases (shuffling, filtering by category) belong here.
  */
 class QuizAppService(
     private val questionRepository: QuestionRepository

@@ -27,7 +27,7 @@ class QuizUiStateTest {
     @Test
     fun `given default state, when currentIndex is accessed, then it is 0`() {
         val state = QuizUiState()
-        assertEquals(0, state.currentIndex)
+        assertEquals(0, state.currentQuestionIndex)
     }
 
     @Test
@@ -89,7 +89,7 @@ class QuizUiStateTest {
     @Test
     fun `given default state, when copied with questions and not loading, then screen should be Quiz`() {
         val questions = listOf(
-            Question(id = 1, text = "Q?", options = listOf("A", "B"), correctOptionIndex = 0)
+            Question(id = 1, question = "Q?", options = listOf("A", "B"), correctOptionIndex = 0)
         )
         val loadedState = QuizUiState().copy(
             questions = questions,
@@ -128,7 +128,7 @@ class QuizUiStateTest {
         val state = QuizUiState(
             isLoading = false,
             screen = QuizAppContract.Quiz,
-            currentIndex = 9,
+            currentQuestionIndex = 9,
             correctCount = 10
         ).copy(screen = QuizAppContract.Results)
         assertEquals(QuizAppContract.Results, state.screen)
@@ -161,8 +161,8 @@ class QuizUiStateTest {
 
     @Test
     fun `given two states with different currentIndex, when compared, then they are not equal`() {
-        val s1 = QuizUiState(currentIndex = 0)
-        val s2 = QuizUiState(currentIndex = 1)
+        val s1 = QuizUiState(currentQuestionIndex = 0)
+        val s2 = QuizUiState(currentQuestionIndex = 1)
         assertTrue(s1 != s2)
     }
 }

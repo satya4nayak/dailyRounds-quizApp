@@ -39,9 +39,9 @@ class QuizAppServiceTest {
     // ─── Fixtures ─────────────────────────────────────────────────────────────
 
     private val sampleQuestions = listOf(
-        Question(id = 1, text = "Q1", options = listOf("A", "B", "C", "D"), correctOptionIndex = 0),
-        Question(id = 2, text = "Q2", options = listOf("A", "B", "C", "D"), correctOptionIndex = 1),
-        Question(id = 3, text = "Q3", options = listOf("A", "B", "C", "D"), correctOptionIndex = 2)
+        Question(id = 1, question = "Q1", options = listOf("A", "B", "C", "D"), correctOptionIndex = 0),
+        Question(id = 2, question = "Q2", options = listOf("A", "B", "C", "D"), correctOptionIndex = 1),
+        Question(id = 3, question = "Q3", options = listOf("A", "B", "C", "D"), correctOptionIndex = 2)
     )
 
     // ─── Happy path ───────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ class QuizAppServiceTest {
 
             val result = service.loadQuestions()
 
-            assertEquals(listOf("Q1", "Q2", "Q3"), result.map { it.text })
+            assertEquals(listOf("Q1", "Q2", "Q3"), result.map { it.question })
         }
 
     // ─── Empty dataset ────────────────────────────────────────────────────────
@@ -142,9 +142,9 @@ class QuizAppServiceTest {
     fun `given repository returns ordered questions, when loadQuestions is called, then order is preserved`() =
         runTest {
             val ordered = listOf(
-                Question(id = 5, text = "Q5", options = listOf("A"), correctOptionIndex = 0),
-                Question(id = 1, text = "Q1", options = listOf("A"), correctOptionIndex = 0),
-                Question(id = 3, text = "Q3", options = listOf("A"), correctOptionIndex = 0)
+                Question(id = 5, question = "Q5", options = listOf("A"), correctOptionIndex = 0),
+                Question(id = 1, question = "Q1", options = listOf("A"), correctOptionIndex = 0),
+                Question(id = 3, question = "Q3", options = listOf("A"), correctOptionIndex = 0)
             )
             coEvery { repository.getQuestions() } returns ordered
 

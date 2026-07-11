@@ -16,8 +16,8 @@ class QuizResultTest {
 
     private val sampleResult = QuizResult(
         totalQuestions = 10,
-        correctCount = 7,
-        skippedCount = 2,
+        correctQuestionCount = 7,
+        skippedQuestionCount = 2,
         longestStreak = 4
     )
 
@@ -30,12 +30,12 @@ class QuizResultTest {
 
     @Test
     fun `given a quiz result, when correctCount is accessed, then correct count is returned`() {
-        assertEquals(7, sampleResult.correctCount)
+        assertEquals(7, sampleResult.correctQuestionCount)
     }
 
     @Test
     fun `given a quiz result, when skippedCount is accessed, then correct count is returned`() {
-        assertEquals(2, sampleResult.skippedCount)
+        assertEquals(2, sampleResult.skippedQuestionCount)
     }
 
     @Test
@@ -49,8 +49,8 @@ class QuizResultTest {
     fun `given two results with identical fields, when compared, then they are equal`() {
         val duplicate = QuizResult(
             totalQuestions = 10,
-            correctCount = 7,
-            skippedCount = 2,
+            correctQuestionCount = 7,
+            skippedQuestionCount = 2,
             longestStreak = 4
         )
         assertEquals(sampleResult, duplicate)
@@ -58,16 +58,16 @@ class QuizResultTest {
 
     @Test
     fun `given two results with different correctCounts, when compared, then they are not equal`() {
-        val different = sampleResult.copy(correctCount = 5)
+        val different = sampleResult.copy(correctQuestionCount = 5)
         assertNotEquals(sampleResult, different)
     }
 
     @Test
     fun `given a result, when copied with updated skippedCount, then only skippedCount changes`() {
-        val updated = sampleResult.copy(skippedCount = 3)
-        assertEquals(3, updated.skippedCount)
+        val updated = sampleResult.copy(skippedQuestionCount = 3)
+        assertEquals(3, updated.skippedQuestionCount)
         assertEquals(sampleResult.totalQuestions, updated.totalQuestions)
-        assertEquals(sampleResult.correctCount, updated.correctCount)
+        assertEquals(sampleResult.correctQuestionCount, updated.correctQuestionCount)
         assertEquals(sampleResult.longestStreak, updated.longestStreak)
     }
 
@@ -77,22 +77,22 @@ class QuizResultTest {
     fun `given a perfect quiz result, when created, then correctCount equals totalQuestions`() {
         val perfect = QuizResult(
             totalQuestions = 10,
-            correctCount = 10,
-            skippedCount = 0,
+            correctQuestionCount = 10,
+            skippedQuestionCount = 0,
             longestStreak = 10
         )
-        assertEquals(perfect.totalQuestions, perfect.correctCount)
+        assertEquals(perfect.totalQuestions, perfect.correctQuestionCount)
     }
 
     @Test
     fun `given a quiz result with all skipped, when created, then correctCount is zero`() {
         val allSkipped = QuizResult(
             totalQuestions = 10,
-            correctCount = 0,
-            skippedCount = 10,
+            correctQuestionCount = 0,
+            skippedQuestionCount = 10,
             longestStreak = 0
         )
-        assertEquals(0, allSkipped.correctCount)
+        assertEquals(0, allSkipped.correctQuestionCount)
         assertEquals(0, allSkipped.longestStreak)
     }
 
@@ -100,12 +100,12 @@ class QuizResultTest {
     fun `given a quiz result with zero questions, when created, then all counts are zero`() {
         val empty = QuizResult(
             totalQuestions = 0,
-            correctCount = 0,
-            skippedCount = 0,
+            correctQuestionCount = 0,
+            skippedQuestionCount = 0,
             longestStreak = 0
         )
         assertEquals(0, empty.totalQuestions)
-        assertEquals(0, empty.correctCount)
+        assertEquals(0, empty.correctQuestionCount)
     }
 
     @Test
@@ -113,8 +113,8 @@ class QuizResultTest {
         // longestStreak could technically be > correctCount in edge cases like streak reset mid-quiz
         val result = QuizResult(
             totalQuestions = 5,
-            correctCount = 2,
-            skippedCount = 1,
+            correctQuestionCount = 2,
+            skippedQuestionCount = 1,
             longestStreak = 2
         )
         assertEquals(2, result.longestStreak)

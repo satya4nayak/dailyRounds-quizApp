@@ -14,10 +14,7 @@ import com.assignment.mcqquiz.feature.quiz.ui.theme.BorderColor
 import com.assignment.mcqquiz.feature.quiz.ui.theme.QuizAppTheme
 
 /**
- * A thin 20dp surface-coloured bar pinned at the top of a screen,
- * separated from the content below by a 1dp [BorderColor] divider.
- *
- * Used in [QuizScreen] and [ResultScreen] (not on SplashScreen).
+ * A thin invisible top bar to support devices with camera cutouts.
  */
 @Composable
 fun ScreenTopBar() {

@@ -42,9 +42,9 @@ class QuestionRepositoryImplTest {
     )
 
     private val expectedDomainModels = listOf(
-        Question(id = 1, text = "Q1", options = listOf("A", "B", "C", "D"), correctOptionIndex = 0),
-        Question(id = 2, text = "Q2", options = listOf("E", "F", "G", "H"), correctOptionIndex = 2),
-        Question(id = 3, text = "Q3", options = listOf("I", "J", "K", "L"), correctOptionIndex = 3)
+        Question(id = 1, question = "Q1", options = listOf("A", "B", "C", "D"), correctOptionIndex = 0),
+        Question(id = 2, question = "Q2", options = listOf("E", "F", "G", "H"), correctOptionIndex = 2),
+        Question(id = 3, question = "Q3", options = listOf("I", "J", "K", "L"), correctOptionIndex = 3)
     )
 
     // ─── Happy path ───────────────────────────────────────────────────────────
@@ -66,9 +66,9 @@ class QuestionRepositoryImplTest {
 
             val result = repository.getQuestions()
 
-            assertEquals("Q1", result[0].text)
-            assertEquals("Q2", result[1].text)
-            assertEquals("Q3", result[2].text)
+            assertEquals("Q1", result[0].question)
+            assertEquals("Q2", result[1].question)
+            assertEquals("Q3", result[2].question)
         }
 
     @Test
@@ -157,7 +157,7 @@ class QuestionRepositoryImplTest {
 
             assertEquals(1, result.size)
             assertEquals(99, result[0].id)
-            assertEquals("Only Q", result[0].text)
+            assertEquals("Only Q", result[0].question)
             assertEquals(1, result[0].correctOptionIndex)
         }
 }

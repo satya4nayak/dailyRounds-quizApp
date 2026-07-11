@@ -19,7 +19,6 @@ private val QuizLightColorScheme = lightColorScheme(
 
 /**
  * Root MaterialTheme wrapper for the Quiz feature.
- * Apply this at the top of the Compose hierarchy in [MainActivity].
  */
 @Composable
 fun QuizAppTheme(

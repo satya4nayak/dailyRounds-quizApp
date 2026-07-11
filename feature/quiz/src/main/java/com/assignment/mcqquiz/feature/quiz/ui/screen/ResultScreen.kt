@@ -47,7 +47,6 @@ import com.assignment.mcqquiz.feature.quiz.ui.theme.SurfaceColor
 import com.assignment.mcqquiz.feature.quiz.ui.theme.SurfaceHi
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextPrimary
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextSecondary
-import com.assignment.mcqquiz.feature.quiz.ui.viewmodel.QuizViewModel
 import kotlinx.coroutines.delay
 import androidx.compose.ui.tooling.preview.Preview
 import com.assignment.mcqquiz.data.domain.model.Question
@@ -62,7 +61,7 @@ import com.assignment.mcqquiz.feature.quiz.ui.theme.QuizAppTheme
 @Composable
 fun ResultScreen(
     state: QuizUiState,
-    onEvent: (QuizViewModel.Event) -> Unit
+    onRestart: () -> Unit
 ) {
     val total = state.questions.size
     var displayedCount by remember { mutableIntStateOf(0) }
@@ -227,7 +226,7 @@ fun ResultScreen(
                 .height(56.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(Primary)
-                .clickable { onEvent(QuizViewModel.Event.RestartQuiz) },
+                .clickable { onRestart() },
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -290,7 +289,7 @@ private fun ResultStatRow(
 private val resultPreviewQuestions = (1..10).map { i ->
     Question(
         id = i,
-        text = "Sample question $i",
+        question = "Sample question $i",
         options = listOf("Option A", "Option B", "Option C", "Option D"),
         correctOptionIndex = 0
     )
@@ -302,13 +301,8 @@ private val resultPreviewQuestions = (1..10).map { i ->
 private fun ResultScreenPreview_GoodScore() {
     QuizAppTheme {
         ResultScreen(
-            state = QuizUiState(
-                questions = resultPreviewQuestions,
-                correctCount = 7,
-                skippedCount = 1,
-                longestStreak = 4
-            ),
-            onEvent = {}
+            state = QuizUiState(questions = resultPreviewQuestions, correctCount = 7, skippedCount = 1, longestStreak = 4),
+            onRestart = {}
         )
     }
 }
@@ -319,13 +313,8 @@ private fun ResultScreenPreview_GoodScore() {
 private fun ResultScreenPreview_PerfectScore() {
     QuizAppTheme {
         ResultScreen(
-            state = QuizUiState(
-                questions = resultPreviewQuestions,
-                correctCount = 10,
-                skippedCount = 0,
-                longestStreak = 10
-            ),
-            onEvent = {}
+            state = QuizUiState(questions = resultPreviewQuestions, correctCount = 10, skippedCount = 0, longestStreak = 10),
+            onRestart = {}
         )
     }
 }
@@ -336,13 +325,8 @@ private fun ResultScreenPreview_PerfectScore() {
 private fun ResultScreenPreview_LowScore() {
     QuizAppTheme {
         ResultScreen(
-            state = QuizUiState(
-                questions = resultPreviewQuestions,
-                correctCount = 3,
-                skippedCount = 4,
-                longestStreak = 2
-            ),
-            onEvent = {}
+            state = QuizUiState(questions = resultPreviewQuestions, correctCount = 3, skippedCount = 4, longestStreak = 2),
+            onRestart = {}
         )
     }
 }

@@ -6,7 +6,6 @@ import com.assignment.mcqquiz.data.infra.mapper.toDomainModel
 import javax.inject.Inject
 
 /**
- * Concrete [QuestionRepository] implementation.
  * Fetches DTOs from [QuestionApiClient] and maps them to domain [Question] entities.
  */
 class QuestionRepositoryImpl @Inject constructor(

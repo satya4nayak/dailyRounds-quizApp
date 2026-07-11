@@ -26,7 +26,7 @@ class QuestionDtoMapperTest {
     fun `given a valid dto, when mapped, then question field becomes text field`() {
         val dto = QuestionDto(id = 1, question = "What is DI?", options = listOf("A", "B"), correctOptionIndex = 1)
         val domain: Question = dto.toDomainModel()
-        assertEquals("What is DI?", domain.text)
+        assertEquals("What is DI?", domain.question)
     }
 
     @Test
@@ -54,7 +54,7 @@ class QuestionDtoMapperTest {
         )
         val expected = Question(
             id = 10,
-            text = "Which keyword makes a Kotlin class final?",
+            question = "Which keyword makes a Kotlin class final?",
             options = listOf("sealed", "open", "abstract", "data"),
             correctOptionIndex = 0
         )
@@ -70,7 +70,7 @@ class QuestionDtoMapperTest {
     fun `given a dto with empty question text, when mapped, then text is empty string`() {
         val dto = QuestionDto(id = 11, question = "", options = listOf("A"), correctOptionIndex = 0)
         val domain: Question = dto.toDomainModel()
-        assertEquals("", domain.text)
+        assertEquals("", domain.question)
     }
 
     @Test
@@ -103,9 +103,9 @@ class QuestionDtoMapperTest {
         val domains = dtos.map { it.toDomainModel() }
 
         assertEquals(3, domains.size)
-        assertEquals("Q1", domains[0].text)
-        assertEquals("Q2", domains[1].text)
-        assertEquals("Q3", domains[2].text)
+        assertEquals("Q1", domains[0].question)
+        assertEquals("Q2", domains[1].question)
+        assertEquals("Q3", domains[2].question)
         assertEquals(0, domains[0].correctOptionIndex)
         assertEquals(1, domains[1].correctOptionIndex)
     }

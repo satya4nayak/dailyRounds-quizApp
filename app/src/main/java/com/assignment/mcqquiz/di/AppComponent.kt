@@ -8,13 +8,9 @@ import javax.inject.Singleton
 
 /**
  * Root Dagger component for the application.
- *
- * Includes both modules that together cover the full dependency graph:
- *   [DataModule]  — provides infra bindings (QuestionApiService, QuestionRepository)
- *   [QuizModule]  — provides app-layer binding (QuizService ← QuizAppService)
  */
 @Singleton
-@Component(modules = [DataModule::class, QuizModule::class])
+@Component(modules = [DataModule::class, QuizModule::class, ViewModelModule::class])
 interface AppComponent {
     fun inject(activity: MainActivity)
 }

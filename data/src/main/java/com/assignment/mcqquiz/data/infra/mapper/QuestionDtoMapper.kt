@@ -8,7 +8,7 @@ import com.assignment.mcqquiz.data.infra.dto.QuestionDto
  */
 fun QuestionDto.toDomainModel(): Question = Question(
     id = id,
-    text = question,
+    question = question,
     options = options,
     correctOptionIndex = correctOptionIndex
 )

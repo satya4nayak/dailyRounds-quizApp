@@ -12,7 +12,7 @@ import com.assignment.mcqquiz.feature.quiz.domain.contract.QuizAppContract
  */
 data class QuizUiState(
     val questions: List<Question> = emptyList(),
-    val currentIndex: Int = 0,
+    val currentQuestionIndex: Int = 0,
     val selectedOptionIndex: Int? = null,
     val isAnswerRevealed: Boolean = false,
     val currentStreak: Int = 0,

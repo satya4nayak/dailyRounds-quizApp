@@ -12,9 +12,6 @@ import javax.inject.Singleton
  *
  * Provides the application-layer binding:
  *   [QuizService] ← [QuizAppService]
- *
- * Infrastructure bindings (QuestionApiService, QuestionRepository) are
- * provided by [DataModule] which is included in the root [AppComponent].
  */
 @Module
 class QuizModule {
