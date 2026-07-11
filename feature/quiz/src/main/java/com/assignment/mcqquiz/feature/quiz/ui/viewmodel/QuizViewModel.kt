@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * MVI ViewModel for the Quiz feature.
@@ -133,7 +134,7 @@ class QuizViewModel @Inject constructor(
 
         autoAdvanceJob?.cancel()
         autoAdvanceJob = viewModelScope.launch {
-            delay(2_000L)
+            delay(AUTO_ADVANCE_DELAY_MS)
             advanceToNextQuestion()
         }
     }
@@ -173,5 +174,8 @@ class QuizViewModel @Inject constructor(
                 )
             }
         }
+    }
+    companion object {
+        private val AUTO_ADVANCE_DELAY_MS = 2_000L.milliseconds
     }
 }

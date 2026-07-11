@@ -1,18 +1,20 @@
 package com.assignment.mcqquiz.feature.quiz.ui.theme
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 
-private val QuizDarkColorScheme = darkColorScheme(
+private val QuizLightColorScheme = lightColorScheme(
     primary = Primary,
     background = Background,
-    surface = Surface,
-    onPrimary = TextPrimary,
+    surface = SurfaceColor,
+    onPrimary = Color.White,
     onBackground = TextPrimary,
     onSurface = TextPrimary,
-    secondary = StreakActive,
-    onSecondary = TextPrimary
+    secondary = Amber,
+    onSecondary = Color.White,
+    outline = BorderColor
 )
 
 /**
@@ -24,9 +26,8 @@ fun QuizAppTheme(
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
-        colorScheme = QuizDarkColorScheme,
+        colorScheme = QuizLightColorScheme,
         typography = QuizTypography,
         content = content
     )
 }
-

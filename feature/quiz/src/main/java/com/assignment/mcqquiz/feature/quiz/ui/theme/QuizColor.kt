@@ -2,20 +2,31 @@ package com.assignment.mcqquiz.feature.quiz.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ── Brand palette ────────────────────────────────────────────────────────────
-val Background  = Color(0xFF121212)
-val Surface     = Color(0xFF1E1E1E)
-val Primary     = Color(0xFF6C63FF)
+// ── Background / Surface ─────────────────────────────────────────────────────
+val Background   = Color(0xFFEEF2F7)
+val SurfaceColor = Color(0xFFFFFFFF)
+val SurfaceHi    = Color(0xFFF4F7FB)
+val BorderColor  = Color(0xFFD5DCE8)
 
-// ── Answer feedback ──────────────────────────────────────────────────────────
-val CorrectGreen = Color(0xFF4CAF50)
-val WrongRed     = Color(0xFFF44336)
+// ── Accent ───────────────────────────────────────────────────────────────────
+val Primary    = Color(0xFF4F7EF7)
+
+// ── Correct ──────────────────────────────────────────────────────────────────
+val CorrectGreen  = Color(0xFF1DAA60)
+val CorrectBg     = Color(0x1A1DAA60)
+val CorrectBorder = Color(0x661DAA60)
+
+// ── Wrong ────────────────────────────────────────────────────────────────────
+val WrongRed    = Color(0xFFE84545)
+val WrongBg     = Color(0x1AE84545)
+val WrongBorder = Color(0x66E84545)
+
+// ── Amber (streak) ───────────────────────────────────────────────────────────
+val Amber    = Color(0xFFE07B00)
+val AmberBg  = Color(0x1AE07B00)
+val AmberBorder = Color(0x66FFB340)
 
 // ── Text hierarchy ───────────────────────────────────────────────────────────
-val TextPrimary   = Color(0xFFFFFFFF)
-val TextSecondary = Color(0xFFB0B0B0)
-
-// ── Streak badge ─────────────────────────────────────────────────────────────
-val StreakActive   = Color(0xFFFF6D00)
-val StreakInactive = Color(0xFF3A3A3A)
-
+val TextPrimary   = Color(0xFF1A2340)
+val TextSecondary = Color(0xFF5B6B8A)
+val TextMuted     = Color(0xFF9AA5BE)

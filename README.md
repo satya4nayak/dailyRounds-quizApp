@@ -6,21 +6,24 @@
 
 ## 📸 App Overview
 
-MCQ Quiz App delivers a 10-question multiple-choice quiz experience with a smooth, animated dark UI. Questions are fetched from a mocked network layer (hardcoded JSON with a simulated 1-second delay), and the entire quiz flow — Splash → Quiz → Results — is managed through a single `Activity` with a sealed-class screen state.
+MCQ Quiz App delivers a 10-question multiple-choice quiz experience with a smooth, animated **light-themed UI**. Questions are fetched from a mocked network layer (hardcoded JSON with a simulated 1-second delay), and the entire quiz flow — Splash → Quiz → Results — is managed through a single `Activity` with a sealed-class screen state.
 
 | Screen | Description |
 |--------|-------------|
-| **Splash** | App logo, name, and loading spinner while questions load |
-| **Quiz** | Animated progress bar, streak badge, 4-option cards with color-coded feedback |
-| **Results** | Score ring, count-up animation, stats (correct / skipped / streak) |
+| **Splash** | Brain emoji logo, app name, info pills, and animated loading dots while questions load |
+| **Quiz** | Step dots, progress bar, question card with accent bar, letter-badged option cards with color-coded feedback, answer banner, and skip button |
+| **Results** | Score ring, count-up animation, stats card (correct / skipped / streak), performance badge, and restart button |
 
 ### ✨ Key Features
 
-- 🎨 **Dark-first Material3 UI** with a custom colour palette  
-- 🔥 **Streak celebration** — every 3 correct answers in a row triggers a full-screen Lottie fire animation  
-- ⏩ **Auto-advance** — after answering, the next question loads automatically after 2 seconds (cancellable by Skip)  
-- 📊 **Animated progress bar** and live streak badge  
-- 🔁 **Restart** the quiz without leaving the app  
+- 🎨 **Light Material3 UI** with a custom blue-gray colour palette
+- 🔤 **Letter-badged option cards** (A / B / C / D) with left accent bar and animated correct/wrong states
+- 🔥 **Streak celebration** — every 3 correct answers in a row triggers a full-screen card overlay with a Lottie fire animation
+- ✅ **Answer feedback banner** — immediately shows Correct / Not quite! / Skipped after each answer
+- 📊 **Step-dot progress indicator** + animated progress bar
+- ⏩ **Auto-advance** — after answering, the next question loads automatically after 2 seconds
+- 🏆 **Performance badge** — earns 🏆 Gold / 🥈 Silver / 🥉 Bronze based on final score
+- 🔁 **Restart** the quiz without leaving the app
 
 ---
 
@@ -171,15 +174,9 @@ Output APK: `app/build/outputs/apk/debug/app-debug.apk`
 ## 📂 Package Structure
 
 ```
-# domain/
-com.assignment.mcqquiz.domain/
-├── model/          Question.kt, QuizResult.kt
-├── repository/     QuestionRepository.kt (interface)
-└── service/        QuizService.kt (interface — port for app layer)
-
 # data/
 com.assignment.mcqquiz.data/
-├── dto/            QuestionDto.kt
+├── domain/model/   Question.kt
 ├── source/         QuizApiService.kt (hardcoded JSON + 1s delay)
 ├── mapper/         QuestionMapper.kt
 ├── repository/     QuestionRepositoryImpl.kt
@@ -187,49 +184,100 @@ com.assignment.mcqquiz.data/
 
 # feature/quiz/
 com.assignment.mcqquiz.feature.quiz/
-├── state/          AppScreen.kt, QuizUiState.kt
-├── viewmodel/      QuizViewModel.kt
-└── ui/
-    ├── screen/     SplashScreen.kt, QuizScreen.kt, ResultScreen.kt
-    ├── component/  OptionCard.kt, ProgressBar.kt, StreakBadge.kt, FireOverlay.kt
-    ├── theme/      Theme.kt, Color.kt, Type.kt
-    └── QuizRoot.kt
+├── domain/
+│   ├── contract/   QuizAppContract.kt (sealed nav state)
+│   └── state/      QuizUiState.kt
+├── ui/
+│   ├── screen/     SplashScreen.kt, QuizScreen.kt, ResultScreen.kt
+│   │               QuizEntryPoint.kt
+│   ├── component/  OptionCard.kt, ProgressBar.kt, StreakBadge.kt,
+│   │               StreakCelebrationOverlay.kt, TopBar.kt
+│   ├── theme/      QuizTheme.kt, QuizColor.kt, QuizType.kt
+│   └── viewmodel/  QuizViewModel.kt
 
 # app/
 com.assignment.mcqquiz/
 ├── MainActivity.kt
 ├── QuizApplication.kt
-├── service/        QuizAppService.kt
-└── di/             AppModule.kt, AppComponent.kt
+└── di/             AppComponent.kt
 ```
 
 ---
 
 ## 🎨 Design System
 
-All colours are defined in `feature/quiz/ui/theme/Color.kt`:
+The app uses a **light theme** (`lightColorScheme`). All colour tokens are defined in `feature/quiz/ui/theme/QuizColor.kt`:
+
+### Background & Surface
 
 | Token | Hex | Usage |
 |---|---|---|
-| `Background` | `#121212` | App background |
-| `Surface` | `#1E1E1E` | Cards and surfaces |
-| `Primary` | `#6C63FF` | Buttons, progress, accents |
-| `CorrectGreen` | `#4CAF50` | Correct answer highlight |
-| `WrongRed` | `#F44336` | Wrong answer highlight |
-| `StreakActive` | `#FF6D00` | Streak badge when ≥ 3 |
-| `StreakInactive` | `#3A3A3A` | Streak badge when < 3 |
+| `Background` | `#EEF2F7` | App/screen background |
+| `SurfaceColor` | `#FFFFFF` | Cards, top bar, option backgrounds |
+| `SurfaceHi` | `#F4F7FB` | Elevated surfaces, skip button bg, step dots |
+| `BorderColor` | `#D5DCE8` | Card borders, dividers |
+
+### Accent
+
+| Token | Hex | Usage |
+|---|---|---|
+| `Primary` | `#4F7EF7` | Buttons, progress bar, active dots, question eyebrow |
+
+### Answer Feedback
+
+| Token | Hex | Usage |
+|---|---|---|
+| `CorrectGreen` | `#1DAA60` | Correct answer text / icon |
+| `CorrectBg` | `#1A1DAA60` (10%) | Correct option background |
+| `CorrectBorder` | `#661DAA60` (40%) | Correct option border |
+| `WrongRed` | `#E84545` | Wrong answer text / icon |
+| `WrongBg` | `#1AE84545` (10%) | Wrong option background |
+| `WrongBorder` | `#66E84545` (40%) | Wrong option border |
+
+### Streak / Amber
+
+| Token | Hex | Usage |
+|---|---|---|
+| `Amber` / `StreakActive` | `#E07B00` | Active streak badge, celebration card, longest streak stat |
+| `AmberBg` | `#1AE07B00` (10%) | Streak badge background |
+| `AmberBorder` | `#66FFB340` (40%) | Streak badge / celebration card border |
+
+### Text
+
+| Token | Hex | Usage |
+|---|---|---|
+| `TextPrimary` | `#1A2340` | Headings, question text, score number |
+| `TextSecondary` | `#5B6B8A` | Body text, labels, skip button text |
+| `TextMuted` | `#9AA5BE` | Hints, counters, timestamps |
 
 ---
 
 ## 🔥 Streak System
 
-- The **streak badge** (🔥 + count) is always visible at the top of the quiz screen
-- When your streak reaches **3, 6, 9, ...** (any multiple of 3), a **full-screen fire overlay** appears:
-  - Lottie fire animation plays
-  - "You're on fire! 🔥" text fades in
+- The **streak badge** (🔥 + count) is always visible in the header of the quiz screen
+  - **Idle** (streak = 0): light `SurfaceHi` background, muted border
+  - **Active** (streak ≥ 1): amber background, amber border, pulse animation
+- When your streak reaches **3, 6, 9, ...** (any multiple of 3), a **full-screen card overlay** appears:
+  - Dark backdrop with a white card, amber border
+  - Lottie fire animation (120 dp)
+  - *"You're on fire!"* title + *"X in a row!"* badge
   - Auto-dismisses after 1.5 seconds (or tap to dismiss early)
-- **Skipping** a question does NOT reset or increment your streak
-- **Wrong answers** reset your streak to 0
+- **Skipping** a question does **not** reset or increment the streak
+- **Wrong answers** reset the streak to 0
+
+---
+
+## 🧩 UI Components
+
+| Component | File | Description |
+|---|---|---|
+| `ScreenTopBar` | `TopBar.kt` | Reusable 20 dp white bar + 1 dp divider pinned at the top of Quiz and Result screens |
+| `OptionCard` | `OptionCard.kt` | Answer option with letter badge (A–D), left accent bar, animated correct/wrong/highlight states |
+| `QuizProgressBar` | `ProgressBar.kt` | Animated 5 dp rounded progress track |
+| `StreakBadge` | `StreakBadge.kt` | Idle / active pill badge with pulse animation |
+| `StreakCelebrationOverlay` | `StreakCelebrationOverlay.kt` | Full-screen dark backdrop + card with Lottie fire, title, badge, and countdown |
+
+All components include `@Preview` functions covering their key visual states.
 
 ---
 

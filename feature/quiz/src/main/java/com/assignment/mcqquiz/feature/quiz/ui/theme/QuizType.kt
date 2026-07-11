@@ -28,6 +28,13 @@ val QuizTypography = Typography(
         lineHeight = 20.sp,
         color = TextSecondary
     ),
+    bodySmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        color = TextMuted
+    ),
     labelLarge = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Medium,
@@ -35,4 +42,3 @@ val QuizTypography = Typography(
         lineHeight = 20.sp
     )
 )
-
