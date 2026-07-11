@@ -32,5 +32,10 @@ dependencies {
     // Dagger — pure, no Hilt
     implementation(libs.dagger)
     kapt(libs.dagger.compiler)
+
+    // ── Test dependencies ─────────────────────────────────────────────────────
+    testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 

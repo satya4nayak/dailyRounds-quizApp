@@ -55,4 +55,10 @@ dependencies {
 
     // ── Lottie (streak celebration overlay) ─────────────────────────────────
     implementation(libs.lottie.compose)
+
+    // ── Test dependencies ─────────────────────────────────────────────────────
+    testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.turbine)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
