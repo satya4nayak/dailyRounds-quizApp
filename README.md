@@ -99,42 +99,6 @@ QuizViewModel.handleEvent()
               └── ShowLoader / NavigateToQuiz / NavigateToResults / ShowError / RestartGame
 ```
 
-### Effect-Driven Navigation
-
-All routing lives exclusively in `MainActivity`. Composable screens are **dumb** — they receive plain state and callbacks; they have no knowledge of the ViewModel or navigation.
-
-```kotlin
-// MainActivity collects the last-replayed effect as Compose state
-val currentEffect by viewModel.effects.collectAsStateWithLifecycle(
-    initialValue = viewModel.effects.replayCache.firstOrNull() ?: Effect.ShowLoader
-)
-
-when (currentEffect) {
-    ShowLoader        -> NetworkLoaderScreen()
-    NavigateToQuiz    -> QuizScreen(...)
-    NavigateToResults -> ResultScreen(...)
-    ShowError         -> QuizErrorBanner(onRetry = { ... })
-    RestartGame       -> { /* handled via LaunchedEffect — relaunches Activity */ }
-}
-```
-
-`replay = 1` ensures the correct screen is restored immediately on configuration change, **without** re-calling the API.
-
-### Config-Change Guard
-
-```kotlin
-// ViewModel
-private var isInitialized = false
-
-private fun onInitialLoad() {
-    if (isInitialized) return   // config change — skip, replay cache already has last effect
-    isInitialized = true
-    loadQuestions()
-}
-```
-
-`Event.InitialLoad` is fired once from `LaunchedEffect(Unit)` in the Activity. `Event.RetryApiCall` bypasses the guard explicitly.
-
 ### Module Graph
 
 ```
