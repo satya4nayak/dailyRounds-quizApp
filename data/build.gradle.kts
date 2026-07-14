@@ -11,6 +11,11 @@ android {
 
     defaultConfig {
         minSdk = 28
+        buildConfigField("String", "BASE_URL", "\"https://gist.githubusercontent.com/\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {
@@ -26,12 +31,16 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
-    // Serialization (QuestionDto)
-    implementation(libs.kotlinx.serialization.json)
+    api(libs.kotlinx.serialization.json)
 
     // Dagger — pure, no Hilt
     implementation(libs.dagger)
     kapt(libs.dagger.compiler)
+
+
+    api(libs.retrofit)
+    api(libs.retrofit.converter.kotlinx.serialization)
+    api(libs.okhttp)
 
     // ── Test dependencies ─────────────────────────────────────────────────────
     testImplementation(libs.junit)

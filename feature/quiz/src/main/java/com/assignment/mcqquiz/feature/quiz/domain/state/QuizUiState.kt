@@ -1,7 +1,6 @@
 package com.assignment.mcqquiz.feature.quiz.domain.state
 
 import com.assignment.mcqquiz.data.domain.model.Question
-import com.assignment.mcqquiz.feature.quiz.domain.contract.QuizAppContract
 
 /**
  * Immutable UI state model for the Quiz feature.
@@ -19,7 +18,5 @@ data class QuizUiState(
     val longestStreak: Int = 0,
     val showStreakCelebration: Boolean = false,
     val correctCount: Int = 0,
-    val skippedCount: Int = 0,
-    val screen: QuizAppContract = QuizAppContract.Splash,
-    val isLoading: Boolean = true
+    val skippedCount: Int = 0
 )

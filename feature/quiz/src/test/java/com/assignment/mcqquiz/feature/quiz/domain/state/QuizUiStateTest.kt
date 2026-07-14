@@ -1,7 +1,6 @@
 package com.assignment.mcqquiz.feature.quiz.domain.state
 
 import com.assignment.mcqquiz.data.domain.model.Question
-import com.assignment.mcqquiz.feature.quiz.domain.contract.QuizAppContract
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -11,8 +10,9 @@ import org.junit.Test
 /**
  * Unit tests for [QuizUiState].
  *
- * Verifies default values, copy-based state transitions, and that the model
- * correctly represents every possible phase of a quiz session.
+ * [QuizUiState] is a pure quiz-session data holder — navigation state is managed
+ * by [com.assignment.mcqquiz.feature.quiz.ui.viewmodel.QuizViewModel.Effect], so
+ * there are no screen or isLoading fields to test here.
  */
 class QuizUiStateTest {
 
@@ -72,38 +72,20 @@ class QuizUiStateTest {
         assertEquals(0, state.skippedCount)
     }
 
-    @Test
-    fun `given default state, when screen is accessed, then it is Splash`() {
-        val state = QuizUiState()
-        assertEquals(QuizAppContract.Splash, state.screen)
-    }
-
-    @Test
-    fun `given default state, when isLoading is accessed, then it is true`() {
-        val state = QuizUiState()
-        assertTrue(state.isLoading)
-    }
-
     // ─── State transitions via copy ───────────────────────────────────────────
 
     @Test
-    fun `given default state, when copied with questions and not loading, then screen should be Quiz`() {
+    fun `given default state, when copied with questions, then questions list is set`() {
         val questions = listOf(
             Question(id = 1, question = "Q?", options = listOf("A", "B"), correctOptionIndex = 0)
         )
-        val loadedState = QuizUiState().copy(
-            questions = questions,
-            isLoading = false,
-            screen = QuizAppContract.Quiz
-        )
-        assertEquals(QuizAppContract.Quiz, loadedState.screen)
-        assertFalse(loadedState.isLoading)
+        val loadedState = QuizUiState().copy(questions = questions)
         assertEquals(1, loadedState.questions.size)
     }
 
     @Test
     fun `given loaded state, when answer is selected, then isAnswerRevealed is true`() {
-        val state = QuizUiState(isLoading = false).copy(
+        val state = QuizUiState().copy(
             selectedOptionIndex = 2,
             isAnswerRevealed = true,
             correctCount = 1,
@@ -118,20 +100,9 @@ class QuizUiStateTest {
 
     @Test
     fun `given active quiz state, when question is skipped, then skippedCount increments`() {
-        val base = QuizUiState(isLoading = false, screen = QuizAppContract.Quiz)
+        val base = QuizUiState()
         val afterSkip = base.copy(skippedCount = base.skippedCount + 1)
         assertEquals(1, afterSkip.skippedCount)
-    }
-
-    @Test
-    fun `given quiz state at last question, when answer given, then screen transitions to Results`() {
-        val state = QuizUiState(
-            isLoading = false,
-            screen = QuizAppContract.Quiz,
-            currentQuestionIndex = 9,
-            correctCount = 10
-        ).copy(screen = QuizAppContract.Results)
-        assertEquals(QuizAppContract.Results, state.screen)
     }
 
     @Test
@@ -166,4 +137,3 @@ class QuizUiStateTest {
         assertTrue(s1 != s2)
     }
 }
-

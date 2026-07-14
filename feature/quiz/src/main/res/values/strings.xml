@@ -1,0 +1,7 @@
+<resources>
+    <!-- Error screen -->
+    <string name="quiz_error_message">Something went wrong, please check your internet connection and try again.</string>
+    <string name="quiz_error_subtitle">The server may be temporarily unavailable.</string>
+    <string name="quiz_error_retry">Retry</string>
+</resources>
+

@@ -2,6 +2,7 @@ package com.assignment.mcqquiz.data.di
 
 import com.assignment.mcqquiz.data.infra.api.QuestionApiClient
 import com.assignment.mcqquiz.data.infra.api.QuestionApiService
+import com.assignment.mcqquiz.data.infra.api.QuizRetrofitService
 import com.assignment.mcqquiz.data.infra.repository.QuestionRepository
 import com.assignment.mcqquiz.data.infra.repository.QuestionRepositoryImpl
 import dagger.Module
@@ -20,7 +21,9 @@ class DataModule {
 
     @Provides
     @Singleton
-    fun provideQuestionApiClient(): QuestionApiClient = QuestionApiService()
+    fun provideQuestionApiClient(
+        retrofitService: QuizRetrofitService
+    ): QuestionApiClient = QuestionApiService(retrofitService)
 
     @Provides
     @Singleton

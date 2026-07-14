@@ -17,7 +17,7 @@ val CorrectBg     = Color(0x1A1DAA60)
 val CorrectBorder = Color(0x661DAA60)
 
 // ── Wrong ────────────────────────────────────────────────────────────────────
-val WrongRed    = Color(0xFFE84545)
+val WrongRed    = Color(0xFFFF5151)
 val WrongBg     = Color(0x1AE84545)
 val WrongBorder = Color(0x66E84545)
 

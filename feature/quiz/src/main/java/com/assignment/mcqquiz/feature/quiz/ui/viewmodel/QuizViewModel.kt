@@ -1,10 +1,12 @@
 package com.assignment.mcqquiz.feature.quiz.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.assignment.mcqquiz.data.domain.service.QuizService
-import com.assignment.mcqquiz.feature.quiz.domain.contract.QuizAppContract
 import com.assignment.mcqquiz.feature.quiz.domain.state.QuizUiState
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -16,103 +18,105 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.log
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * MVI ViewModel for the Quiz feature.
  *
- * All MVI contracts ([Event], [Effect]) are co-located here as nested types —
- *
  * Inputs:  [Event]       — user intents sent from the screen via [handleEvent]
- * Outputs: [QuizUiState] — immutable state collected by the screen
- *          [Effect]      — one-off side-effect commands (errors, navigation)
+ * Outputs: [QuizUiState] — immutable quiz-session data collected by the screen
+ *          [Effect]      — single stream for both navigation signals and one-shot OS actions.
  */
 class QuizViewModel @Inject constructor(
     private val quizService: QuizService
 ) : ViewModel() {
 
     // ─── MVI Contracts ────────────────────────────────────────────────────────
+
     sealed interface Event {
-        /** The user tapped an answer option at the given [optionIndex]. */
         data class OptionSelected(val optionIndex: Int) : Event
-
-        /** The user tapped "Skip Question". */
-        data object SkipQuestion : Event
-
-        /** The user tapped "Restart Quiz" on the Results screen. */
-        data object RestartQuiz : Event
+        data object SkipQuestion  : Event
+        data object RestartQuiz   : Event
+        data object RetryApiCall  : Event
+        data object InitialLoad   : Event
     }
 
     sealed interface Effect {
-        /** Emitted when question loading fails. Show [message] in a Snackbar. */
-        data class ShowQuestionLoadError(val message: String) : Effect
-
-        /**
-         * Emitted when the quiz session ends (user taps Restart or all questions are done).
-         * The Activity should call finish() and restart itself so Compose resets from scratch.
-         */
-        data object RestartApp : Effect
+        /** Network call in progress — show the loader screen. */
+        data object ShowLoader        : Effect
+        /** Questions loaded — navigate to the quiz screen. */
+        data object NavigateToQuiz    : Effect
+        /** All questions answered/skipped — navigate to the results screen. */
+        data object NavigateToResults : Effect
+        /** Network call failed or returned no data — show the error screen. */
+        data object ShowError         : Effect
+        /** User tapped Restart — one-shot: finish this Activity, launch a fresh one. */
+        data object RestartGame       : Effect
     }
 
-    // ─── State & Effect Streams ───────────────────────────────────────────────
+    // ─── Streams ──────────────────────────────────────────────────────────────
 
     private val _uiState = MutableStateFlow(QuizUiState())
     val uiState: StateFlow<QuizUiState> = _uiState.asStateFlow()
 
-    private val _effects = MutableSharedFlow<Effect>(extraBufferCapacity = 1)
+    private val _effects = MutableSharedFlow<Effect>(replay = 1, extraBufferCapacity = 8)
     val effects: SharedFlow<Effect> = _effects.asSharedFlow()
 
     private var autoAdvanceJob: Job? = null
 
-    init {
-        loadQuestions()
-    }
+    /** Guards against re-fetching on configuration changes. */
+    private var isInitialized = false
+
+    init { /* intentionally empty — load is triggered explicitly via Event.InitialLoad */ }
 
     // ─── Public MVI Entry Point ───────────────────────────────────────────────
 
     fun handleEvent(event: Event) {
         when (event) {
+            is Event.InitialLoad    -> onInitialLoad()
             is Event.OptionSelected -> onOptionSelected(event.optionIndex)
             is Event.SkipQuestion   -> onSkip()
             is Event.RestartQuiz    -> onRestart()
+            is Event.RetryApiCall   -> onRetry()
         }
     }
 
-    // ─── Private State Reducers ───────────────────────────────────────────────
+    // ─── Private Reducers ────────────────────────────────────────────────────
 
-    private fun loadQuestions() {
+    private suspend fun loadQuestions() {
+        _effects.emit(Effect.ShowLoader)
         viewModelScope.launch {
             try {
                 val questions = quizService.loadQuestions()
-                _uiState.update { state ->
-                    state.copy(
-                        questions = questions,
-                        isLoading = false,
-                        screen = QuizAppContract.Quiz,
-                        // Carry the all-time best streak forward into the new session so
-                        // the Results screen always shows the historical high-water mark.
-                        longestStreak = allTimeLongestStreak
-                    )
+                if (questions.isEmpty()) {
+                    _effects.emit(Effect.ShowError)
+                } else {
+                    _uiState.update { it.copy(questions = questions, longestStreak = allTimeLongestStreak) }
+                    _effects.emit(Effect.NavigateToQuiz)
                 }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false) }
-                _effects.emit(Effect.ShowQuestionLoadError("Failed to load questions. Please try again."))
+            } catch (_: Exception) {
+                _effects.emit(Effect.ShowError)
             }
         }
     }
 
+    private fun onInitialLoad() {
+        if (isInitialized) return   // config change — ViewModel already has data, no extra API call
+        isInitialized = true
+        viewModelScope.launch { loadQuestions() }
+    }
+
+    private fun onRetry() {
+        viewModelScope.launch { loadQuestions() }    // user explicitly asked — bypass guard
+    }
+
     private fun onOptionSelected(index: Int) {
         val state = _uiState.value
-        if (state.isAnswerRevealed) return
-
         val isCorrect = index == state.questions[state.currentQuestionIndex].correctOptionIndex
         val newStreak = if (isCorrect) state.currentStreak + 1 else 0
         val newLongestStreak = maxOf(state.longestStreak, newStreak)
-
-        // Show the celebration whenever the streak reaches or exceeds 3.
-        // The ViewModel is solely responsible for both showing and hiding it.
         val showStreakCelebration = isCorrect && newStreak >= 3
-
 
         _uiState.update {
             it.copy(
@@ -139,35 +143,27 @@ class QuizViewModel @Inject constructor(
         advanceToNextQuestion()
     }
 
-
     private fun onRestart() {
         autoAdvanceJob?.cancel()
-        // Persist the highest streak reached in this session before the Activity dies.
         allTimeLongestStreak = maxOf(allTimeLongestStreak, _uiState.value.longestStreak)
-        // Use emit (suspending) instead of tryEmit to guarantee delivery to the collector.
-        viewModelScope.launch {
-            _effects.emit(Effect.RestartApp)
-        }
+        viewModelScope.launch { _effects.emit(Effect.RestartGame) }
     }
 
     private fun advanceToNextQuestion() {
-        _uiState.update { state ->
-            val nextIndex = state.currentQuestionIndex + 1
-            if (nextIndex < state.questions.size) {
-                state.copy(
+        val state = _uiState.value
+        val nextIndex = state.currentQuestionIndex + 1
+        if (nextIndex < state.questions.size) {
+            _uiState.update {
+                it.copy(
                     currentQuestionIndex = nextIndex,
                     selectedOptionIndex = null,
                     isAnswerRevealed = false,
                     showStreakCelebration = false
                 )
-            } else {
-                state.copy(
-                    screen = QuizAppContract.Results,
-                    selectedOptionIndex = null,
-                    isAnswerRevealed = false,
-                    showStreakCelebration = false
-                )
             }
+        } else {
+            _uiState.update { it.copy(selectedOptionIndex = null, isAnswerRevealed = false, showStreakCelebration = false) }
+            viewModelScope.launch { _effects.emit(Effect.NavigateToResults) }
         }
     }
 
@@ -178,16 +174,12 @@ class QuizViewModel @Inject constructor(
     }
 
     companion object {
-        // Survives Activity restarts within the same process lifetime.
-        // internal so tests in this module can reset between runs.
         internal var allTimeLongestStreak: Int = 0
             private set
 
-        /** For use in unit tests only — resets the cross-session streak counter. */
         internal fun resetAllTimeLongestStreakForTest() { allTimeLongestStreak = 0 }
 
         private val AUTO_ADVANCE_DELAY_MS         = 2_000L.milliseconds
         private val STREAK_CELEBRATION_DISMISS_MS = 1_500L.milliseconds
     }
-
 }

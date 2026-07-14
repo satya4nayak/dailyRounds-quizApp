@@ -1,8 +1,6 @@
 package com.assignment.mcqquiz.feature.quiz.ui.screen
 
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.ui.tooling.preview.Preview
-import com.assignment.mcqquiz.feature.quiz.ui.theme.QuizAppTheme
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -31,12 +29,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.assignment.mcqquiz.feature.quiz.ui.theme.Amber
 import com.assignment.mcqquiz.feature.quiz.ui.theme.Background
 import com.assignment.mcqquiz.feature.quiz.ui.theme.BorderColor
 import com.assignment.mcqquiz.feature.quiz.ui.theme.Primary
+import com.assignment.mcqquiz.feature.quiz.ui.theme.QuizAppTheme
 import com.assignment.mcqquiz.feature.quiz.ui.theme.SurfaceColor
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextMuted
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextPrimary
