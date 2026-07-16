@@ -3,5 +3,48 @@
     <string name="quiz_error_message">Something went wrong, please check your internet connection and try again.</string>
     <string name="quiz_error_subtitle">The server may be temporarily unavailable.</string>
     <string name="quiz_error_retry">Retry</string>
-</resources>
 
+    <!-- Category List Screen -->
+    <string name="quiz_categories_title">Quiz Categories</string>
+    <string name="quiz_categories_subtitle">Select a category to begin</string>
+    <string name="category_status_not_started">Not started yet</string>
+    <string name="category_status_in_progress">In Progress</string>
+    <string name="category_status_completed">Completed ✓</string>
+    <string name="category_button_start">Start</string>
+    <string name="category_button_continue">Continue</string>
+    <string name="category_button_review">Revisit</string>
+
+    <!-- Quiz Screen -->
+    <string name="quiz_question_of">of</string>
+    <string name="quiz_question_label">QUESTION %1$d</string>
+    <string name="quiz_banner_skipped">Skipped</string>
+    <string name="quiz_banner_correct">Correct!</string>
+    <string name="quiz_banner_incorrect">Not quite!</string>
+    <string name="quiz_banner_moving_next">Moving to next question…</string>
+    <string name="quiz_banner_correct_above">The correct answer is highlighted above</string>
+    <string name="quiz_skip_button">↪  Skip Question</string>
+
+    <!-- Result Screen -->
+    <string name="result_title">Quiz Complete!</string>
+    <string name="result_subtitle">Here\'s how you did</string>
+    <string name="result_score_total">/ %1$d</string>
+    <string name="result_stat_correct">Correct Answers</string>
+    <string name="result_stat_skipped">Skipped</string>
+    <string name="result_stat_streak">This Attempt</string>
+    <string name="result_stat_all_time_streak">All Time Best Streak</string>
+    <string name="result_badge_excellent_title">Excellent!</string>
+    <string name="result_badge_excellent_sub">Outstanding score — you\'re a quiz master!</string>
+    <string name="result_badge_good_title">Good effort!</string>
+    <string name="result_badge_good_sub">Score %1$d+ to earn the 🏆 Gold badge</string>
+    <string name="result_badge_poor_title">Keep practicing!</string>
+    <string name="result_badge_poor_sub">You\'ll nail it next time!</string>
+    <string name="result_finish_button">Finish</string>
+
+    <!-- Network Loader Screen -->
+    <string name="quiz_loader_title">QuizMaster</string>
+    <string name="quiz_loader_subtitle">Test your Android knowledge</string>
+    <string name="quiz_loader_loading">Loading questions…</string>
+
+    <!-- Top Bar -->
+    <string name="top_bar_back">←</string>
+</resources>

@@ -1,10 +1,14 @@
 package com.assignment.mcqquiz.feature.quiz.ui.viewmodel
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.assignment.mcqquiz.data.domain.model.CategoryStatus
 import com.assignment.mcqquiz.data.domain.model.Question
+import com.assignment.mcqquiz.data.domain.service.CategoryProgressSnapshot
 import com.assignment.mcqquiz.data.domain.service.QuizService
 import com.assignment.mcqquiz.feature.quiz.util.MainDispatcherRule
 import io.mockk.coEvery
+import io.mockk.coJustRun
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,6 +23,18 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
+/**
+ * Unit tests for [QuizViewModel].
+ *
+ * The ViewModel coordinates quiz session state via MVI:
+ *  - [QuizViewModel.Event] drives all state changes.
+ *  - [QuizViewModel.Effect] drives one-shot navigation and UI side-effects.
+ *  - [QuizViewModel.uiState] is the observable session state.
+ *
+ * [QuizService] is mocked so tests are pure JVM with no I/O.
+ * [MainDispatcherRule] replaces Dispatchers.Main with a test dispatcher so
+ * viewModelScope coroutines run under virtual time.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class QuizViewModelTest {
 
@@ -27,20 +43,46 @@ class QuizViewModelTest {
 
     private val quizService: QuizService = mockk()
 
-    private fun buildQuestions(
-        count: Int = 5,
-        alternateCorrectAt: Set<Int> = emptySet()
-    ): List<Question> = (0 until count).map { i ->
+    private val categoryId = "cat-android"
+    private val questionUrl = "https://example.com/questions.json"
+
+    // ─── Fixtures ─────────────────────────────────────────────────────────────
+
+    private fun buildQuestions(count: Int = 5): List<Question> = (0 until count).map { i ->
         Question(
             id = i + 1,
             question = "Question ${i + 1}",
             options = listOf("Option A", "Option B", "Option C", "Option D"),
-            correctOptionIndex = if (i in alternateCorrectAt) 1 else 0
+            correctOptionIndex = 0  // Option A is always the correct answer
         )
     }
 
-    private fun createViewModel(): QuizViewModel = QuizViewModel(quizService).also {
-        it.handleEvent(QuizViewModel.Event.InitialLoad)
+    private fun buildSavedStateHandle(
+        catId: String = categoryId,
+        url: String = questionUrl
+    ) = SavedStateHandle(
+        mapOf(
+            QuizViewModel.KEY_CATEGORY_ID to catId,
+            QuizViewModel.KEY_QUESTION_URL to url
+        )
+    )
+
+    private fun createViewModel(
+        catId: String = categoryId,
+        url: String = questionUrl
+    ) = QuizViewModel(
+        savedStateHandle = buildSavedStateHandle(catId, url),
+        quizService = quizService
+    )
+
+    @Before
+    fun setUp() {
+        // Sensible defaults — individual tests override as needed.
+        coEvery { quizService.loadQuestions(any()) } returns buildQuestions()
+        coEvery { quizService.getProgress(any()) } returns null
+        coJustRun { quizService.saveProgress(any(), any(), any()) }
+        coJustRun { quizService.updateLastQuestionId(any(), any()) }
+        coJustRun { quizService.updateStreaks(any(), any(), any()) }
     }
 
     // =========================================================================
@@ -48,49 +90,42 @@ class QuizViewModelTest {
     // =========================================================================
 
     @Test
-    fun `given new ViewModel, when initialised, then currentScreen is Loader`() =
+    fun `given new ViewModel, when InitialLoad fired, then ShowLoader is first effect`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions()
-            val viewModel = createViewModel()
-            viewModel.effects.test {
+            val vm = createViewModel()
+            vm.effects.test {
+                vm.handleEvent(QuizViewModel.Event.InitialLoad)
                 assertEquals(QuizViewModel.Effect.ShowLoader, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
         }
 
     @Test
-    fun `given new ViewModel, when initialised, then initial state has empty questions`() =
+    fun `given questions returned, when InitialLoad completes, then questions are populated`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions()
-            val viewModel = createViewModel()
-            assertTrue(viewModel.uiState.value.questions.isEmpty())
-        }
-
-    @Test
-    fun `given quiz service returns questions, when loading completes, then state has correct questions`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            val questions = buildQuestions(count = 10)
-            coEvery { quizService.loadQuestions() } returns questions
-            val viewModel = createViewModel()
+            val questions = buildQuestions(count = 3)
+            coEvery { quizService.loadQuestions(questionUrl) } returns questions
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            assertEquals(questions, viewModel.uiState.value.questions)
+            assertEquals(questions, vm.uiState.value.questions)
         }
 
     @Test
-    fun `given quiz service returns questions, when loading completes, then currentScreen is Quiz`() =
+    fun `given questions loaded, when load completes, then NavigateToQuiz effect is emitted`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions()
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            assertEquals(QuizViewModel.Effect.NavigateToQuiz, viewModel.effects.replayCache.firstOrNull())
+            assertEquals(QuizViewModel.Effect.NavigateToQuiz, vm.effects.replayCache.firstOrNull())
         }
 
     @Test
-    fun `given quiz service returns questions, when loading completes, then screen transitions Loader then Quiz`() =
+    fun `given questions loaded, when load completes, then effects sequence is ShowLoader then NavigateToQuiz`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions()
-            val viewModel = createViewModel()
-            viewModel.effects.test {
+            val vm = createViewModel()
+            vm.effects.test {
+                vm.handleEvent(QuizViewModel.Event.InitialLoad)
                 assertEquals(QuizViewModel.Effect.ShowLoader, awaitItem())
                 advanceUntilIdle()
                 assertEquals(QuizViewModel.Effect.NavigateToQuiz, awaitItem())
@@ -99,105 +134,294 @@ class QuizViewModelTest {
         }
 
     @Test
-    fun `given quiz service returns questions, when loading completes, then quizService is called exactly once`() =
+    fun `given no prior progress, when load completes, then progress saved as IN_PROGRESS`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions()
-            val viewModel = createViewModel()
+            coEvery { quizService.getProgress(categoryId) } returns null
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            coVerify(exactly = 1) { quizService.loadQuestions() }
+            coVerify {
+                quizService.saveProgress(
+                    categoryId = categoryId,
+                    status = CategoryStatus.IN_PROGRESS,
+                    lastQuestionId = 1
+                )
+            }
         }
 
     @Test
-    fun `given quiz service returns questions, when loading completes, then currentIndex starts at 0`() =
+    fun `given no prior progress, when load completes, then index starts at 0`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions()
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            assertEquals(0, viewModel.uiState.value.currentQuestionIndex)
-        }
-
-    // ─── Loading failure ──────────────────────────────────────────────────────
-
-    @Test
-    fun `given quiz service throws exception, when loading fails, then currentScreen is Error`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } throws RuntimeException("Network error")
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            assertEquals(QuizViewModel.Effect.ShowError, viewModel.effects.replayCache.firstOrNull())
+            assertEquals(0, vm.uiState.value.currentQuestionIndex)
         }
 
     @Test
-    fun `given quiz service throws exception, when loading fails, then questions list is empty`() =
+    fun `given loadQuestions called, then url from SavedStateHandle is used`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } throws RuntimeException("Network error")
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            assertTrue(viewModel.uiState.value.questions.isEmpty())
+            coVerify(exactly = 1) { quizService.loadQuestions(questionUrl) }
         }
 
     @Test
-    fun `given quiz service throws exception, when loading fails, then currentScreen is not Quiz`() =
+    fun `given InitialLoad already fired, when fired again, then loadQuestions called only once`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } throws RuntimeException("Network error")
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            assertTrue(viewModel.effects.replayCache.firstOrNull() !is QuizViewModel.Effect.NavigateToQuiz)
+            coVerify(exactly = 1) { quizService.loadQuestions(any()) }
+        }
+
+    // ─── Resume from IN_PROGRESS ──────────────────────────────────────────────
+
+    @Test
+    fun `given IN_PROGRESS with savedQuestionId, when loaded, then resumes at correct index`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            val questions = buildQuestions(count = 5)
+            coEvery { quizService.loadQuestions(any()) } returns questions
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.IN_PROGRESS,
+                lastQuestionId = 3,  // question with id=3 is at index 2
+                currentStreak = 2,
+                allTimeLongestStreak = 4
+            )
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            assertEquals(2, vm.uiState.value.currentQuestionIndex)
+        }
+
+    @Test
+    fun `given IN_PROGRESS, when loaded, then currentStreak restored from DB`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.IN_PROGRESS,
+                lastQuestionId = 1,
+                currentStreak = 3,
+                allTimeLongestStreak = 5
+            )
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            assertEquals(3, vm.uiState.value.currentStreak)
+        }
+
+    @Test
+    fun `given IN_PROGRESS, when loaded, then allTimeLongestStreak restored from DB`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.IN_PROGRESS,
+                lastQuestionId = 1,
+                currentStreak = 2,
+                allTimeLongestStreak = 7
+            )
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            assertEquals(7, vm.uiState.value.allTimeLongestStreak)
+        }
+
+    @Test
+    fun `given IN_PROGRESS with unknown savedId, when loaded, then falls back to index 0`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.IN_PROGRESS,
+                lastQuestionId = 999  // not in the question list
+            )
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            assertEquals(0, vm.uiState.value.currentQuestionIndex)
+        }
+
+    @Test
+    fun `given NOT_STARTED progress, when loaded, then starts at index 0 same as new`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.NOT_STARTED
+            )
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            assertEquals(0, vm.uiState.value.currentQuestionIndex)
+        }
+
+    // ─── Review mode (COMPLETED) ──────────────────────────────────────────────
+
+    @Test
+    fun `given COMPLETED progress, when loaded in review mode, then starts at index 0`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.COMPLETED,
+                allTimeLongestStreak = 5
+            )
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            assertEquals(0, vm.uiState.value.currentQuestionIndex)
+        }
+
+    @Test
+    fun `given COMPLETED progress, when loaded in review mode, then allTimeLongestStreak seeded from DB`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.COMPLETED,
+                allTimeLongestStreak = 8
+            )
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            assertEquals(8, vm.uiState.value.allTimeLongestStreak)
+        }
+
+    @Test
+    fun `given COMPLETED progress, when loaded in review mode, then currentStreak is 0`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.COMPLETED,
+                currentStreak = 0,
+                allTimeLongestStreak = 5
+            )
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            assertEquals(0, vm.uiState.value.currentStreak)
+        }
+
+    // ─── Error cases ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `given service throws, when loading, then ShowError effect is emitted`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } throws RuntimeException("network error")
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            assertEquals(QuizViewModel.Effect.ShowError, vm.effects.replayCache.firstOrNull())
+        }
+
+    @Test
+    fun `given service returns empty list, when loading, then ShowError effect is emitted`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } returns emptyList()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            assertEquals(QuizViewModel.Effect.ShowError, vm.effects.replayCache.firstOrNull())
+        }
+
+    @Test
+    fun `given service throws, when loading fails, then questions list stays empty`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } throws RuntimeException("error")
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            assertTrue(vm.uiState.value.questions.isEmpty())
+        }
+
+    @Test
+    fun `given error state, when RetryApiCall fired, then loadQuestions is called again`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } throws RuntimeException("error")
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions()
+            vm.handleEvent(QuizViewModel.Event.RetryApiCall)
+            advanceUntilIdle()
+            coVerify(exactly = 2) { quizService.loadQuestions(any()) }
+        }
+
+    @Test
+    fun `given error state, when RetryApiCall succeeds, then NavigateToQuiz is emitted`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } throws RuntimeException("error")
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions()
+            vm.handleEvent(QuizViewModel.Event.RetryApiCall)
+            advanceUntilIdle()
+            assertEquals(QuizViewModel.Effect.NavigateToQuiz, vm.effects.replayCache.firstOrNull())
         }
 
     // =========================================================================
     // 2. Option Selection — Correct Answer
     // =========================================================================
 
-    @Before
-    fun setUp() {
-        QuizViewModel.resetAllTimeLongestStreakForTest()
-        coEvery { quizService.loadQuestions() } returns buildQuestions()
-    }
-
     @Test
-    fun `given loaded quiz, when correct option is selected, then isAnswerRevealed is true`() =
+    fun `given loaded quiz, when correct option selected, then isAnswerRevealed is true`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertTrue(viewModel.uiState.value.isAnswerRevealed)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertTrue(vm.uiState.value.isAnswerRevealed)
         }
 
     @Test
-    fun `given loaded quiz, when correct option is selected, then selectedOptionIndex matches the selection`() =
+    fun `given loaded quiz, when correct option selected, then selectedOptionIndex matches`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertEquals(0, viewModel.uiState.value.selectedOptionIndex)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertEquals(0, vm.uiState.value.selectedOptionIndex)
         }
 
     @Test
-    fun `given loaded quiz, when correct option is selected, then correctCount increments to 1`() =
+    fun `given loaded quiz, when correct option selected, then correctCount increments to 1`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertEquals(1, viewModel.uiState.value.correctCount)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertEquals(1, vm.uiState.value.correctCount)
         }
 
     @Test
-    fun `given loaded quiz, when correct option is selected, then currentStreak increments to 1`() =
+    fun `given loaded quiz, when correct option selected, then currentStreak increments to 1`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertEquals(1, viewModel.uiState.value.currentStreak)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertEquals(1, vm.uiState.value.currentStreak)
         }
 
     @Test
-    fun `given loaded quiz, when correct option is selected, then longestStreak is updated to 1`() =
+    fun `given loaded quiz, when correct option selected, then longestStreak updates to 1`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertEquals(1, viewModel.uiState.value.longestStreak)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertEquals(1, vm.uiState.value.longestStreak)
+        }
+
+    @Test
+    fun `given loaded quiz, when correct option selected, then updateStreaks is called with new streak`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            advanceUntilIdle()
+            coVerify { quizService.updateStreaks(categoryId, 1, 1) }
         }
 
     // =========================================================================
@@ -205,483 +429,531 @@ class QuizViewModelTest {
     // =========================================================================
 
     @Test
-    fun `given loaded quiz, when incorrect option is selected, then correctCount stays at 0`() =
+    fun `given loaded quiz, when wrong option selected, then correctCount stays 0`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(3))
-            assertEquals(0, viewModel.uiState.value.correctCount)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(3))
+            assertEquals(0, vm.uiState.value.correctCount)
         }
 
     @Test
-    fun `given loaded quiz, when incorrect option is selected, then currentStreak resets to 0`() =
+    fun `given loaded quiz, when wrong option selected, then currentStreak resets to 0`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(3))
-            assertEquals(0, viewModel.uiState.value.currentStreak)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(3))
+            assertEquals(0, vm.uiState.value.currentStreak)
         }
 
     @Test
-    fun `given loaded quiz, when incorrect option is selected, then isAnswerRevealed becomes true`() =
+    fun `given loaded quiz, when wrong option selected, then isAnswerRevealed is true`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(3))
-            assertTrue(viewModel.uiState.value.isAnswerRevealed)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(3))
+            assertTrue(vm.uiState.value.isAnswerRevealed)
         }
 
     @Test
-    fun `given loaded quiz, when incorrect option is selected, then longestStreak stays at 0`() =
+    fun `given loaded quiz, when wrong option selected, then longestStreak stays 0`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(2))
-            assertEquals(0, viewModel.uiState.value.longestStreak)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(3))
+            assertEquals(0, vm.uiState.value.longestStreak)
         }
 
-    // =========================================================================
-    // 4. UI enforces single-selection — no ViewModel guard needed
-    //
-    // The OptionCard composable uses clickable(enabled = !isAnswerRevealed), so
-    // onOptionSelected is never called a second time after an answer is revealed.
-    // There is therefore no ViewModel-level guard to test here.
-    // =========================================================================
-
-
-    // =========================================================================
-    // 5. Streak Milestones & Auto-Dismiss
-    // =========================================================================
-
     @Test
-    fun `given 2 correct answers already, when third correct option selected, then showStreakCelebration is immediately true`() =
+    fun `given streak of 2 then wrong answer, when streak broken, then longestStreak preserved at 2`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
-            val viewModel = createViewModel()
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 10)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
             repeat(2) {
-                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
                 advanceTimeBy(2_001L)
                 advanceUntilIdle()
             }
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertTrue(viewModel.uiState.value.showStreakCelebration)
-            assertEquals(3, viewModel.uiState.value.currentStreak)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(3)) // wrong
+            assertEquals(2, vm.uiState.value.longestStreak)
+            assertEquals(0, vm.uiState.value.currentStreak)
         }
 
     @Test
-    fun `given streak celebration showing, when 1500ms pass, then ViewModel auto-dismisses showStreakCelebration`() =
+    fun `given wrong answer, when updateStreaks called, then streak is 0`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(3))
+            advanceUntilIdle()
+            coVerify { quizService.updateStreaks(categoryId, 0, 0) }
+        }
+
+    // =========================================================================
+    // 4. Streak Milestones & Celebration
+    // =========================================================================
+
+    @Test
+    fun `given 2 correct answers, when third correct selected, then showStreakCelebration is true`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 10)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
             repeat(2) {
-                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
                 advanceTimeBy(2_001L)
                 advanceUntilIdle()
             }
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertTrue(viewModel.uiState.value.showStreakCelebration)
-            advanceTimeBy(1_500L)
-            advanceUntilIdle()
-            assertFalse(viewModel.uiState.value.showStreakCelebration)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertTrue(vm.uiState.value.showStreakCelebration)
+            assertEquals(3, vm.uiState.value.currentStreak)
         }
 
     @Test
-    fun `given streak celebration showing, when 2 seconds pass, then question advances and celebration is cleared`() =
+    fun `given only 2 correct answers, when second selected, then showStreakCelebration is false`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
-            val viewModel = createViewModel()
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 10)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertFalse(vm.uiState.value.showStreakCelebration)
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertFalse(vm.uiState.value.showStreakCelebration)
+            assertEquals(2, vm.uiState.value.currentStreak)
+        }
+
+    @Test
+    fun `given celebration showing, when 1500ms pass, then ViewModel auto-dismisses showStreakCelebration`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 10)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
             repeat(2) {
-                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-                advanceTimeBy(2_001L)
-                advanceUntilIdle()
+                vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L); advanceUntilIdle()
             }
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            val indexBeforeAdvance = viewModel.uiState.value.currentQuestionIndex
-            advanceTimeBy(2_001L)
-            advanceUntilIdle()
-            assertFalse(viewModel.uiState.value.showStreakCelebration)
-            assertEquals(indexBeforeAdvance + 1, viewModel.uiState.value.currentQuestionIndex)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertTrue(vm.uiState.value.showStreakCelebration)
+            advanceTimeBy(1_500L); advanceUntilIdle()
+            assertFalse(vm.uiState.value.showStreakCelebration)
         }
 
     @Test
-    fun `given streak already at 3, when fourth correct option selected, then showStreakCelebration is true again`() =
+    fun `given celebration showing, when full 2s pass, then question advances and celebration cleared`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
-            val viewModel = createViewModel()
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 10)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            repeat(2) {
+                vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L); advanceUntilIdle()
+            }
+            val indexBefore = vm.uiState.value.currentQuestionIndex
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            assertFalse(vm.uiState.value.showStreakCelebration)
+            assertEquals(indexBefore + 1, vm.uiState.value.currentQuestionIndex)
+        }
+
+    @Test
+    fun `given streak already at 3, when 4th correct selected, then showStreakCelebration is true again`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 10)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
             repeat(3) {
-                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-                advanceTimeBy(2_001L)
-                advanceUntilIdle()
+                vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L); advanceUntilIdle()
             }
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertTrue(viewModel.uiState.value.showStreakCelebration)
-            assertEquals(4, viewModel.uiState.value.currentStreak)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertTrue(vm.uiState.value.showStreakCelebration)
+            assertEquals(4, vm.uiState.value.currentStreak)
+        }
+
+    // =========================================================================
+    // 5. All-Time Longest Streak
+    // =========================================================================
+
+    @Test
+    fun `given allTimeLongest 3 in DB, when 4th correct answer, then allTimeLongestStreak updates to 4`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.IN_PROGRESS,
+                lastQuestionId = 1,
+                currentStreak = 3,
+                allTimeLongestStreak = 3
+            )
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 10)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0)) // streak: 3 → 4
+            assertEquals(4, vm.uiState.value.allTimeLongestStreak)
         }
 
     @Test
-    fun `given streak of 2, when second correct option is selected, then showStreakCelebration is false`() =
+    fun `given allTimeLongest 5 in DB, when current streak reaches only 3, then allTimeLongest stays 5`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
-            val viewModel = createViewModel()
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.COMPLETED,
+                allTimeLongestStreak = 5
+            )
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 10)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertFalse(viewModel.uiState.value.showStreakCelebration)
-            assertEquals(1, viewModel.uiState.value.currentStreak)
-            advanceTimeBy(2_001L)
-            advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertFalse(viewModel.uiState.value.showStreakCelebration)
-            assertEquals(2, viewModel.uiState.value.currentStreak)
+            // First answer wrong (resets streak), then 3 correct (streak = 3 < 5)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(3))
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            repeat(3) {
+                vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L); advanceUntilIdle()
+            }
+            assertEquals(5, vm.uiState.value.allTimeLongestStreak)
         }
 
     @Test
-    fun `given streak of 3 then wrong answer, when streak broken, then longestStreak is preserved at 3`() =
+    fun `given allTimeLongest 0, when 3 correct answers, then allTimeLongest updates to 3`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
-            val viewModel = createViewModel()
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 10)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
             repeat(3) {
-                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-                advanceTimeBy(2_001L)
-                advanceUntilIdle()
+                vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                advanceTimeBy(2_001L); advanceUntilIdle()
             }
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(3))
-            assertEquals(3, viewModel.uiState.value.longestStreak)
-            assertEquals(0, viewModel.uiState.value.currentStreak)
+            assertEquals(3, vm.uiState.value.allTimeLongestStreak)
         }
 
     // =========================================================================
-    // 6. Skip Question
+    // 6. Review Mode — COMPLETED → first answer re-saves as IN_PROGRESS
     // =========================================================================
 
     @Test
-    fun `given loaded quiz, when question is skipped, then skippedCount increments to 1`() =
+    fun `given COMPLETED review mode, when first option selected, then saveProgress called with IN_PROGRESS`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.COMPLETED,
+                allTimeLongestStreak = 0
+            )
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
-            assertEquals(1, viewModel.uiState.value.skippedCount)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            advanceUntilIdle()
+            coVerify {
+                quizService.saveProgress(
+                    categoryId = categoryId,
+                    status = CategoryStatus.IN_PROGRESS,
+                    lastQuestionId = any()
+                )
+            }
         }
 
     @Test
-    fun `given loaded quiz, when question is skipped, then currentIndex advances to 1`() =
+    fun `given COMPLETED review mode, when second option selected, then saveProgress NOT called again`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            coEvery { quizService.getProgress(categoryId) } returns CategoryProgressSnapshot(
+                categoryId = categoryId,
+                status = CategoryStatus.COMPLETED
+            )
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 10)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
-            assertEquals(1, viewModel.uiState.value.currentQuestionIndex)
-        }
-
-    @Test
-    fun `given loaded quiz, when question is skipped, then isAnswerRevealed remains false`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
-            assertFalse(viewModel.uiState.value.isAnswerRevealed)
-        }
-
-    @Test
-    fun `given loaded quiz, when question is skipped, then selectedOptionIndex remains null`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0)) // second answer
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
-            assertNull(viewModel.uiState.value.selectedOptionIndex)
-        }
-
-    @Test
-    fun `given loaded quiz, when all questions are skipped, then currentScreen is Results`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 3)
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            repeat(3) { viewModel.handleEvent(QuizViewModel.Event.SkipQuestion) }
-            advanceUntilIdle() // let the viewModelScope.launch { emit(NavigateToResults) } coroutine run
-            assertEquals(QuizViewModel.Effect.NavigateToResults, viewModel.effects.replayCache.firstOrNull())
-        }
-
-    @Test
-    fun `given loaded quiz, when all questions are skipped, then skippedCount equals total questions`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            val questionCount = 3
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = questionCount)
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            repeat(questionCount) { viewModel.handleEvent(QuizViewModel.Event.SkipQuestion) }
-            assertEquals(questionCount, viewModel.uiState.value.skippedCount)
-        }
-
-    @Test
-    fun `given multiple skips, when skipping, then skippedCount accumulates correctly`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
-            val viewModel = createViewModel()
-            advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
-            viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
-            viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
-            assertEquals(3, viewModel.uiState.value.skippedCount)
-            assertEquals(3, viewModel.uiState.value.currentQuestionIndex)
+            // saveProgress(IN_PROGRESS) should be called exactly once (for the first answer)
+            coVerify(exactly = 1) {
+                quizService.saveProgress(categoryId, CategoryStatus.IN_PROGRESS, any())
+            }
         }
 
     // =========================================================================
-    // 7. Auto-Advance After Delay
+    // 7. Skip Question
     // =========================================================================
 
     @Test
-    fun `given correct option selected, when 2 seconds pass, then currentIndex advances to 1`() =
+    fun `given loaded quiz, when SkipQuestion fired, then skippedCount increments immediately`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 5)
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertEquals(0, viewModel.uiState.value.currentQuestionIndex)
-            advanceTimeBy(2_001L)
-            advanceUntilIdle()
-            assertEquals(1, viewModel.uiState.value.currentQuestionIndex)
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
+            assertEquals(1, vm.uiState.value.skippedCount)
         }
 
     @Test
-    fun `given incorrect option selected, when 2 seconds pass, then currentIndex still advances to 1`() =
+    fun `given loaded quiz, when SkipQuestion fired, then isAnswerRevealed is true immediately`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 5)
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(3))
-            assertEquals(0, viewModel.uiState.value.currentQuestionIndex)
-            advanceTimeBy(2_001L)
-            advanceUntilIdle()
-            assertEquals(1, viewModel.uiState.value.currentQuestionIndex)
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
+            assertTrue(vm.uiState.value.isAnswerRevealed)
         }
 
     @Test
-    fun `given option selected, when 2 seconds pass, then isAnswerRevealed resets to false on next question`() =
+    fun `given loaded quiz, when SkipQuestion fired, then selectedOptionIndex is null`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 5)
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertTrue(viewModel.uiState.value.isAnswerRevealed)
-            advanceTimeBy(2_001L)
-            advanceUntilIdle()
-            assertFalse(viewModel.uiState.value.isAnswerRevealed)
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
+            assertNull(vm.uiState.value.selectedOptionIndex)
         }
 
     @Test
-    fun `given option selected, when 2 seconds pass, then selectedOptionIndex resets to null on next question`() =
+    fun `given loaded quiz, when SkipQuestion fired and 2s pass, then index advances to 1`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 5)
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            advanceTimeBy(2_001L)
-            advanceUntilIdle()
-            assertNull(viewModel.uiState.value.selectedOptionIndex)
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            assertEquals(1, vm.uiState.value.currentQuestionIndex)
         }
 
     @Test
-    fun `given option selected on last question, when 2 seconds pass, then currentScreen is Results`() =
+    fun `given 2-question quiz, when both questions skipped with delays, then NavigateToResults emitted`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 1)
-            val viewModel = createViewModel()
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 2)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            advanceTimeBy(2_001L)
-            advanceUntilIdle()
-            assertEquals(QuizViewModel.Effect.NavigateToResults, viewModel.effects.replayCache.firstOrNull())
+            // Skip Q1
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            // Skip Q2
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            assertEquals(QuizViewModel.Effect.NavigateToResults, vm.effects.replayCache.firstOrNull())
         }
 
     @Test
-    fun `given auto-advance pending, when question is skipped, then auto-advance is cancelled and index jumps immediately`() =
+    fun `given skipped question, when 2s pass, then isAnswerRevealed resets to false`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 5)
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
-            assertEquals(1, viewModel.uiState.value.currentQuestionIndex)
-            advanceTimeBy(2_001L)
-            advanceUntilIdle()
-            assertEquals(1, viewModel.uiState.value.currentQuestionIndex)
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
+            assertTrue(vm.uiState.value.isAnswerRevealed)
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            assertFalse(vm.uiState.value.isAnswerRevealed)
         }
 
     // =========================================================================
-    // 8. Last Question Navigation
+    // 8. Auto-Advance After Delay
     // =========================================================================
 
     @Test
-    fun `given last question, when skipped, then currentScreen is Results immediately`() =
+    fun `given correct option selected, when 2s pass, then currentIndex advances to 1`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 2)
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
-            viewModel.handleEvent(QuizViewModel.Event.SkipQuestion)
-            advanceUntilIdle() // let the viewModelScope.launch { emit(NavigateToResults) } coroutine run
-            assertEquals(QuizViewModel.Effect.NavigateToResults, viewModel.effects.replayCache.firstOrNull())
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertEquals(0, vm.uiState.value.currentQuestionIndex)
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            assertEquals(1, vm.uiState.value.currentQuestionIndex)
         }
 
     @Test
-    fun `given last question answered correctly, when 2 seconds pass, then correctCount is preserved`() =
+    fun `given wrong option selected, when 2s pass, then index still advances`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 1)
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            advanceTimeBy(2_001L)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(3))
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            assertEquals(1, vm.uiState.value.currentQuestionIndex)
+        }
+
+    @Test
+    fun `given option selected, when 2s pass, then isAnswerRevealed resets to false`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            assertEquals(QuizViewModel.Effect.NavigateToResults, viewModel.effects.replayCache.firstOrNull())
-            assertEquals(1, viewModel.uiState.value.correctCount)
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            assertTrue(vm.uiState.value.isAnswerRevealed)
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            assertFalse(vm.uiState.value.isAnswerRevealed)
+        }
+
+    @Test
+    fun `given option selected, when 2s pass, then selectedOptionIndex resets to null`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            assertNull(vm.uiState.value.selectedOptionIndex)
+        }
+
+    @Test
+    fun `given 1-question quiz, when option selected and 2s pass, then NavigateToResults emitted`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 1)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            assertEquals(QuizViewModel.Effect.NavigateToResults, vm.effects.replayCache.firstOrNull())
+        }
+
+    @Test
+    fun `given advance to next question, when advancing, then updateLastQuestionId called with next question id`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            val questions = buildQuestions(count = 3)
+            coEvery { quizService.loadQuestions(any()) } returns questions
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            coVerify { quizService.updateLastQuestionId(categoryId, questions[1].id) }
         }
 
     // =========================================================================
-    // 9. Restart Quiz — finish-and-restart via Effect
+    // 9. Finish Module
     // =========================================================================
 
     @Test
-    fun `given quiz in progress, when RestartQuiz event fired, then Effect RestartApp is emitted`() =
+    fun `given loaded quiz, when FinishModule fired, then saveProgress called with COMPLETED`() =
         runTest(mainDispatcherRule.testScheduler) {
-            val viewModel = createViewModel()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            viewModel.effects.test {
-                awaitItem() // consume replayed NavigateToQuiz (replay=1 replays last navigation effect)
-                viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
+            vm.handleEvent(QuizViewModel.Event.FinishModule)
+            advanceUntilIdle()
+            coVerify { quizService.saveProgress(categoryId, CategoryStatus.COMPLETED, null) }
+        }
+
+    @Test
+    fun `given loaded quiz, when FinishModule fired, then FinishModule effect is emitted`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.effects.test {
+                awaitItem() // consume replayed NavigateToQuiz
+                vm.handleEvent(QuizViewModel.Event.FinishModule)
                 advanceUntilIdle()
-                assertTrue(awaitItem() is QuizViewModel.Effect.RestartGame)
+                assertEquals(QuizViewModel.Effect.FinishModule, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    // =========================================================================
+    // 10. Navigate Back
+    // =========================================================================
+
+    @Test
+    fun `given loaded quiz at Q1, when NavigateBack fired, then updateLastQuestionId called with Q1 id`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            val questions = buildQuestions(count = 5)
+            coEvery { quizService.loadQuestions(any()) } returns questions
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.NavigateBack)
+            advanceUntilIdle()
+            coVerify { quizService.updateLastQuestionId(categoryId, questions[0].id) }
+        }
+
+    @Test
+    fun `given loaded quiz, when NavigateBack fired, then NavigateBack effect is emitted`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.effects.test {
+                awaitItem() // consume replayed effect
+                vm.handleEvent(QuizViewModel.Event.NavigateBack)
+                advanceUntilIdle()
+                assertEquals(QuizViewModel.Effect.NavigateBack, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
         }
 
     @Test
-    fun `given quiz with longestStreak 4, when RestartQuiz event fired, then allTimeLongestStreak is updated`() =
+    fun `given empty questions, when NavigateBack fired, then updateLastQuestionId NOT called`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
-            val viewModel = createViewModel()
+            coEvery { quizService.loadQuestions(any()) } returns emptyList()
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            repeat(4) {
-                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-                advanceTimeBy(2_001L)
-                advanceUntilIdle()
-            }
-            assertEquals(4, viewModel.uiState.value.longestStreak)
-            viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
-            assertEquals(4, QuizViewModel.allTimeLongestStreak)
-        }
-
-    @Test
-    fun `given prior allTimeLongestStreak of 5, when new questions load, then longestStreak starts at 5`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
-            val firstVm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.NavigateBack)
             advanceUntilIdle()
-            repeat(5) {
-                firstVm.handleEvent(QuizViewModel.Event.OptionSelected(0))
-                advanceTimeBy(2_001L)
-                advanceUntilIdle()
-            }
-            firstVm.handleEvent(QuizViewModel.Event.RestartQuiz)
-            assertEquals(5, QuizViewModel.allTimeLongestStreak)
-
-            val newVm = createViewModel()
-            advanceUntilIdle()
-            assertEquals(5, newVm.uiState.value.longestStreak)
-        }
-
-    @Test
-    fun `given current session longestStreak 3 and prior allTimeLongestStreak 5, when RestartQuiz fired, then allTimeLongestStreak stays 5`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 10)
-            val firstVm = createViewModel()
-            advanceUntilIdle()
-            repeat(5) {
-                firstVm.handleEvent(QuizViewModel.Event.OptionSelected(0))
-                advanceTimeBy(2_001L)
-                advanceUntilIdle()
-            }
-            firstVm.handleEvent(QuizViewModel.Event.RestartQuiz)
-
-            val secondVm = createViewModel()
-            advanceUntilIdle()
-            repeat(3) {
-                secondVm.handleEvent(QuizViewModel.Event.OptionSelected(0))
-                advanceTimeBy(2_001L)
-                advanceUntilIdle()
-            }
-            secondVm.handleEvent(QuizViewModel.Event.RestartQuiz)
-            assertEquals(5, QuizViewModel.allTimeLongestStreak)
-        }
-
-    @Test
-    fun `given quiz completed, when RestartQuiz event fired, then Effect RestartApp is emitted`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 1)
-            val viewModel = createViewModel()
-            // Complete the quiz (answer last question + wait for auto-advance)
-            advanceUntilIdle()
-            viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            advanceTimeBy(2_001L)
-            advanceUntilIdle()
-
-            viewModel.effects.test {
-                awaitItem() // consume replayed NavigateToResults (replay=1)
-                viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
-                advanceUntilIdle()
-                assertTrue(awaitItem() is QuizViewModel.Effect.RestartGame)
-                cancelAndIgnoreRemainingEvents()
-            }
+            coVerify(exactly = 0) { quizService.updateLastQuestionId(any(), any()) }
         }
 
     // =========================================================================
-    // 10. StateFlow — Full State Emission Sequence
+    // 11. StateFlow — Full Happy-Path Sequence
     // =========================================================================
 
     @Test
-    fun `given full happy-path quiz with 2 questions, when played completely, then state sequence is correct`() =
+    fun `given 2-question quiz, when played completely, then state sequence is correct`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } returns buildQuestions(count = 2)
-            val viewModel = createViewModel()
-
-            viewModel.uiState.test {
-                // 1. Initial state — questions empty
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 2)
+            val vm = createViewModel()
+            vm.uiState.test {
+                // 1. Initial empty state
                 val initial = awaitItem()
                 assertTrue(initial.questions.isEmpty())
 
-                // 2. Questions loaded
+                // 2. Load questions
+                vm.handleEvent(QuizViewModel.Event.InitialLoad)
                 advanceUntilIdle()
                 val loaded = awaitItem()
                 assertEquals(2, loaded.questions.size)
                 assertEquals(0, loaded.currentQuestionIndex)
 
                 // 3. Answer Q1 correctly
-                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
-                val answered = awaitItem()
-                assertTrue(answered.isAnswerRevealed)
-                assertEquals(1, answered.correctCount)
-                assertEquals(1, answered.currentStreak)
+                vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                val answered1 = awaitItem()
+                assertTrue(answered1.isAnswerRevealed)
+                assertEquals(1, answered1.correctCount)
+                assertEquals(1, answered1.currentStreak)
 
-                // 4. Auto-advance after 2s — Q2
-                advanceTimeBy(2_001L)
-                advanceUntilIdle()
+                // 4. Auto-advance to Q2
+                advanceTimeBy(2_001L); advanceUntilIdle()
                 val q2 = awaitItem()
                 assertEquals(1, q2.currentQuestionIndex)
                 assertFalse(q2.isAnswerRevealed)
                 assertNull(q2.selectedOptionIndex)
 
                 // 5. Answer Q2 correctly
-                viewModel.handleEvent(QuizViewModel.Event.OptionSelected(0))
+                vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
                 val answered2 = awaitItem()
-                assertTrue(answered2.isAnswerRevealed)
                 assertEquals(2, answered2.correctCount)
                 assertEquals(2, answered2.currentStreak)
 
-                // 6. Auto-advance → clears answer state, currentScreen transitions to Results
-                advanceTimeBy(2_001L)
-                advanceUntilIdle()
+                // 6. Auto-advance → clears answer state, NavigateToResults emitted
+                advanceTimeBy(2_001L); advanceUntilIdle()
                 val cleared = awaitItem()
                 assertFalse(cleared.isAnswerRevealed)
                 assertNull(cleared.selectedOptionIndex)
@@ -690,26 +962,17 @@ class QuizViewModelTest {
             }
         }
 
-    // =========================================================================
-    // 11. Navigation state + RestartGame effect — combined failure + restart
-    // =========================================================================
-
     @Test
-    fun `given quiz service throws, when load fails and RestartQuiz is fired, then screen is Error then RestartGame effect emitted`() =
+    fun `given last question answered correctly, when result reached, then correctCount preserved`() =
         runTest(mainDispatcherRule.testScheduler) {
-            coEvery { quizService.loadQuestions() } throws RuntimeException("Always fails")
-            val viewModel = createViewModel()
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 1)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            assertEquals(QuizViewModel.Effect.ShowError, viewModel.effects.replayCache.firstOrNull())
-
-            viewModel.effects.test {
-                awaitItem() // consume replayed ShowError (replay=1)
-                viewModel.handleEvent(QuizViewModel.Event.RestartQuiz)
-                advanceUntilIdle()
-                assertTrue(awaitItem() is QuizViewModel.Effect.RestartGame)
-
-                cancelAndIgnoreRemainingEvents()
-            }
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
+            advanceTimeBy(2_001L); advanceUntilIdle()
+            assertEquals(QuizViewModel.Effect.NavigateToResults, vm.effects.replayCache.firstOrNull())
+            assertEquals(1, vm.uiState.value.correctCount)
         }
 }
 

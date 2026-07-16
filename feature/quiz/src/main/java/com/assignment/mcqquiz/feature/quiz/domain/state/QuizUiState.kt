@@ -16,6 +16,8 @@ data class QuizUiState(
     val isAnswerRevealed: Boolean = false,
     val currentStreak: Int = 0,
     val longestStreak: Int = 0,
+    /** The highest streak ever achieved for this category across all time. Loaded from DB on start. */
+    val allTimeLongestStreak: Int = 0,
     val showStreakCelebration: Boolean = false,
     val correctCount: Int = 0,
     val skippedCount: Int = 0

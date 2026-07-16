@@ -27,6 +27,12 @@ android {
     }
 }
 
+kapt {
+    arguments {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+}
+
 dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
@@ -42,9 +48,13 @@ dependencies {
     api(libs.retrofit.converter.kotlinx.serialization)
     api(libs.okhttp)
 
+    // ── Room ─────────────────────────────────────────────────────────────────
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    kapt(libs.room.compiler)
+
     // ── Test dependencies ─────────────────────────────────────────────────────
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
 }
-

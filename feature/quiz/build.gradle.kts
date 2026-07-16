@@ -45,6 +45,7 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.ktx)
+    implementation(libs.activity.compose)
 
     // ── Coroutines ───────────────────────────────────────────────────────────
     implementation(libs.kotlinx.coroutines.android)
@@ -52,9 +53,6 @@ dependencies {
     // ── Dagger (pure — no Hilt) ──────────────────────────────────────────────
     implementation(libs.dagger)
     kapt(libs.dagger.compiler)
-
-    // ── Lottie (streak celebration overlay) ─────────────────────────────────
-    implementation(libs.lottie.compose)
 
     // ── Test dependencies ─────────────────────────────────────────────────────
     testImplementation(libs.junit)

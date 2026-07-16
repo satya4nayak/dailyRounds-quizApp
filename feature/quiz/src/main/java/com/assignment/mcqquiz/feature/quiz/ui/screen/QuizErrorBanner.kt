@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,6 +23,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.assignment.mcqquiz.feature.quiz.R
+import com.assignment.mcqquiz.feature.quiz.ui.component.ScreenTopBar
 import com.assignment.mcqquiz.feature.quiz.ui.theme.Background
 import com.assignment.mcqquiz.feature.quiz.ui.theme.QuizAppTheme
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextPrimary
@@ -30,21 +32,30 @@ import com.assignment.mcqquiz.feature.quiz.ui.theme.WrongRed
 
 /**
  * Full-screen error state shown when a network or data error occurs.
- * Tapping **Retry** triggers a new API request.
+ * [onBack] — when provided, shows a ← back button in the top bar.
+ * [onRetry] — triggers a new API request.
  */
 @Composable
 fun QuizErrorBanner(
     onRetry: () -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(Background)
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
     ) {
+        ScreenTopBar(onBack = onBack)
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
         // ── Warning icon ──────────────────────────────────────────────────────
         Text(
             text = "⚠️",
@@ -88,10 +99,11 @@ fun QuizErrorBanner(
                 fontSize = 15.sp
             )
         }
-    }
+        } // end inner Column
+    } // end outer Column
 }
 
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showSystemUi = true)
 @Composable
 private fun QuizErrorBannerPreview() {
     QuizAppTheme {

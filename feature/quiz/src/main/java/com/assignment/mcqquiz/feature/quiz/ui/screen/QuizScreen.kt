@@ -24,9 +24,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.assignment.mcqquiz.data.domain.model.Question
+import com.assignment.mcqquiz.feature.quiz.R
 import com.assignment.mcqquiz.feature.quiz.domain.state.QuizUiState
 import com.assignment.mcqquiz.feature.quiz.ui.component.OptionCard
 import com.assignment.mcqquiz.feature.quiz.ui.component.QuizProgressBar
@@ -54,7 +56,8 @@ import com.assignment.mcqquiz.feature.quiz.ui.theme.QuizAppTheme
 fun QuizScreen(
     state: QuizUiState,
     onOptionSelected: (Int) -> Unit,
-    onSkip: () -> Unit
+    onSkip: () -> Unit,
+    onBack: () -> Unit
 ) {
     if (state.questions.isEmpty()) return
 
@@ -68,8 +71,8 @@ fun QuizScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // ── Top bar ───────────────────────────────────────────
-            ScreenTopBar()
+            // ── Top bar ───────────────────────────────────────
+            ScreenTopBar(onBack = onBack)
 
             // ── Scrollable content ────────────────────────────────
             Column(
@@ -95,7 +98,7 @@ fun QuizScreen(
                         color = TextPrimary
                     )
                     Text(
-                        text = " of $total",
+                        text = " ${stringResource(R.string.quiz_question_of)} $total",
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary
                     )
@@ -129,7 +132,7 @@ fun QuizScreen(
                         .padding(start = 20.dp, end = 20.dp, top = 25.dp, bottom = 22.dp)
                 ) {
                     Text(
-                        text = "QUESTION ${state.currentQuestionIndex + 1}",
+                        text = stringResource(R.string.quiz_question_label, state.currentQuestionIndex + 1),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Primary,
@@ -189,11 +192,14 @@ fun QuizScreen(
                     else -> Color(0x66E84545)
                 }
                 val bannerIcon  = when { skipped -> "⏭️"; isCorrectAnswer -> "✅"; else -> "❌" }
-                val bannerTitle = when { skipped -> "Skipped"; isCorrectAnswer -> "Correct!"; else -> "Not quite!" }
+                val bannerTitle = when {
+                    skipped        -> stringResource(R.string.quiz_banner_skipped)
+                    isCorrectAnswer -> stringResource(R.string.quiz_banner_correct)
+                    else           -> stringResource(R.string.quiz_banner_incorrect)
+                }
                 val bannerSub   = when {
-                    skipped -> "Moving to next question…"
-                    isCorrectAnswer -> "Moving to next question…"
-                    else -> "The correct answer is highlighted above"
+                    skipped || isCorrectAnswer -> stringResource(R.string.quiz_banner_moving_next)
+                    else                       -> stringResource(R.string.quiz_banner_correct_above)
                 }
                 val bannerTitleColor = when {
                     skipped -> TextSecondary
@@ -244,7 +250,7 @@ fun QuizScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "↪  Skip Question",
+                    text = stringResource(R.string.quiz_skip_button),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TextSecondary.copy(alpha = skipAlpha),
@@ -300,46 +306,50 @@ private fun QuizScreenPreview_Default() {
         QuizScreen(
             state = QuizUiState(questions = previewQuestions, currentQuestionIndex = 0, currentStreak = 0),
             onOptionSelected = {},
-            onSkip = {}
+            onSkip = {},
+            onBack = {}
         )
     }
 }
 
 /** Correct answer selected on question 1 */
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showSystemUi = true)
 @Composable
 private fun QuizScreenPreview_CorrectAnswer() {
     QuizAppTheme {
         QuizScreen(
             state = QuizUiState(questions = previewQuestions, currentQuestionIndex = 0, selectedOptionIndex = 0, isAnswerRevealed = true, currentStreak = 1),
             onOptionSelected = {},
-            onSkip = {}
+            onSkip = {},
+            onBack = {}
         )
     }
 }
 
 /** Wrong answer selected on question 2, streak reset */
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showSystemUi = true)
 @Composable
 private fun QuizScreenPreview_WrongAnswer() {
     QuizAppTheme {
         QuizScreen(
             state = QuizUiState(questions = previewQuestions, currentQuestionIndex = 1, selectedOptionIndex = 2, isAnswerRevealed = true, currentStreak = 0),
             onOptionSelected = {},
-            onSkip = {}
+            onSkip = {},
+            onBack = {}
         )
     }
 }
 
 /** Mid-quiz with active streak badge */
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showSystemUi = true)
 @Composable
 private fun QuizScreenPreview_ActiveStreak() {
     QuizAppTheme {
         QuizScreen(
             state = QuizUiState(questions = previewQuestions, currentQuestionIndex = 2, currentStreak = 3),
             onOptionSelected = {},
-            onSkip = {}
+            onSkip = {},
+            onBack = {}
         )
     }
 }

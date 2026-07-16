@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.assignment.mcqquiz.feature.quiz.domain.state.QuizUiState
+import com.assignment.mcqquiz.feature.quiz.R
 import com.assignment.mcqquiz.feature.quiz.ui.component.ScreenTopBar
 import com.assignment.mcqquiz.feature.quiz.ui.theme.Amber
 import com.assignment.mcqquiz.feature.quiz.ui.theme.AmberBg
@@ -48,6 +49,7 @@ import com.assignment.mcqquiz.feature.quiz.ui.theme.SurfaceHi
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextPrimary
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.assignment.mcqquiz.data.domain.model.Question
 import com.assignment.mcqquiz.feature.quiz.ui.theme.QuizAppTheme
@@ -61,7 +63,7 @@ import com.assignment.mcqquiz.feature.quiz.ui.theme.QuizAppTheme
 @Composable
 fun ResultScreen(
     state: QuizUiState,
-    onRestart: () -> Unit
+    onFinish: () -> Unit
 ) {
     val total = state.questions.size
     var displayedCount by remember { mutableIntStateOf(0) }
@@ -81,8 +83,8 @@ fun ResultScreen(
             .fillMaxSize()
             .background(Background)
     ) {
-        // ── Top bar ───────────────────────────────────────────────
-        ScreenTopBar()
+        // ── Top bar ───────────────────────────────────────────
+        ScreenTopBar(onBack = onFinish)
 
         // ── Scrollable content ─────────────────────────────────────
         Column(
@@ -99,14 +101,14 @@ fun ResultScreen(
         Text(text = "🎉", fontSize = 36.sp)
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = "Quiz Complete!",
+            text = stringResource(R.string.result_title),
             fontSize = 22.sp,
             fontWeight = FontWeight.ExtraBold,
             color = TextPrimary,
             letterSpacing = (-0.3).sp
         )
         Text(
-            text = "Here's how you did",
+            text = stringResource(R.string.result_subtitle),
             fontSize = 13.sp,
             color = TextSecondary
         )
@@ -136,7 +138,7 @@ fun ResultScreen(
                     lineHeight = 40.sp
                 )
                 Text(
-                    text = "/ $total",
+                    text = stringResource(R.string.result_score_total, total),
                     fontSize = 14.sp,
                     color = TextSecondary,
                     fontWeight = FontWeight.Medium
@@ -157,7 +159,7 @@ fun ResultScreen(
             ResultStatRow(
                 icon = "✅",
                 iconBgColor = CorrectBg,
-                label = "Correct Answers",
+                label = stringResource(R.string.result_stat_correct),
                 value = "${state.correctCount} / $total",
                 valueColor = CorrectGreen
             )
@@ -165,7 +167,7 @@ fun ResultScreen(
             ResultStatRow(
                 icon = "⏭",
                 iconBgColor = SurfaceHi,
-                label = "Skipped",
+                label = stringResource(R.string.result_stat_skipped),
                 value = "${state.skippedCount}",
                 valueColor = TextSecondary
             )
@@ -173,8 +175,16 @@ fun ResultScreen(
             ResultStatRow(
                 icon = "🔥",
                 iconBgColor = AmberBg,
-                label = "Longest Streak",
+                label = stringResource(R.string.result_stat_streak),
                 value = "${state.longestStreak}",
+                valueColor = Amber
+            )
+            HorizontalDivider(color = BorderColor, thickness = 1.dp)
+            ResultStatRow(
+                icon = "🏅",
+                iconBgColor = AmberBg,
+                label = stringResource(R.string.result_stat_all_time_streak),
+                value = "${state.allTimeLongestStreak}",
                 valueColor = Amber
             )
         }
@@ -184,11 +194,11 @@ fun ResultScreen(
         // ── Performance badge ─────────────────────────────────────
         val (badgeEmoji, badgeTitle, badgeSub) = when {
             state.correctCount >= (total * 0.8).toInt() ->
-                Triple("🏆", "Excellent!", "Outstanding score — you're a quiz master!")
+                Triple("🏆", stringResource(R.string.result_badge_excellent_title), stringResource(R.string.result_badge_excellent_sub))
             state.correctCount >= (total * 0.5).toInt() ->
-                Triple("🥈", "Good effort!", "Score ${(total * 0.8).toInt()}+ to earn the 🏆 Gold badge")
+                Triple("🥈", stringResource(R.string.result_badge_good_title), stringResource(R.string.result_badge_good_sub, (total * 0.8).toInt()))
             else ->
-                Triple("🥉", "Keep practicing!", "You'll nail it next time!")
+                Triple("🥉", stringResource(R.string.result_badge_poor_title), stringResource(R.string.result_badge_poor_sub))
         }
 
         Row(
@@ -219,18 +229,18 @@ fun ResultScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // ── Restart button ────────────────────────────────────────
+        // ── Finish button ─────────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(Primary)
-                .clickable { onRestart() },
+                .clickable { onFinish() },
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "↩  Restart Quiz",
+                text = stringResource(R.string.result_finish_button),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
@@ -296,37 +306,37 @@ private val resultPreviewQuestions = (1..10).map { i ->
 }
 
 /** Good score — 7/10, silver badge */
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showSystemUi = true)
 @Composable
 private fun ResultScreenPreview_GoodScore() {
     QuizAppTheme {
         ResultScreen(
             state = QuizUiState(questions = resultPreviewQuestions, correctCount = 7, skippedCount = 1, longestStreak = 4),
-            onRestart = {}
+            onFinish = {}
         )
     }
 }
 
 /** Perfect score — 10/10, gold badge */
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showSystemUi = true)
 @Composable
 private fun ResultScreenPreview_PerfectScore() {
     QuizAppTheme {
         ResultScreen(
             state = QuizUiState(questions = resultPreviewQuestions, correctCount = 10, skippedCount = 0, longestStreak = 10),
-            onRestart = {}
+            onFinish = {}
         )
     }
 }
 
 /** Low score — 3/10, bronze badge */
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showSystemUi = true)
 @Composable
 private fun ResultScreenPreview_LowScore() {
     QuizAppTheme {
         ResultScreen(
             state = QuizUiState(questions = resultPreviewQuestions, correctCount = 3, skippedCount = 4, longestStreak = 2),
-            onRestart = {}
+            onFinish = {}
         )
     }
 }

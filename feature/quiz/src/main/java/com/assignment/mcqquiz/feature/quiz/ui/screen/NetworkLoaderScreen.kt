@@ -7,7 +7,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,18 +29,17 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.assignment.mcqquiz.feature.quiz.R
 import com.assignment.mcqquiz.feature.quiz.ui.theme.Amber
 import com.assignment.mcqquiz.feature.quiz.ui.theme.Background
-import com.assignment.mcqquiz.feature.quiz.ui.theme.BorderColor
 import com.assignment.mcqquiz.feature.quiz.ui.theme.Primary
 import com.assignment.mcqquiz.feature.quiz.ui.theme.QuizAppTheme
-import com.assignment.mcqquiz.feature.quiz.ui.theme.SurfaceColor
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextMuted
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextPrimary
 import com.assignment.mcqquiz.feature.quiz.ui.theme.TextSecondary
-
 /**
  * Loading screen shown while questions are being fetched.
  */
@@ -75,7 +73,7 @@ fun NetworkLoaderScreen() {
 
             // ── Title ─────────────────────────────────────────────
             Text(
-                text = "QuizMaster",
+                text = stringResource(R.string.quiz_loader_title),
                 fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = TextPrimary,
@@ -85,19 +83,12 @@ fun NetworkLoaderScreen() {
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Test your Android knowledge",
+                text = stringResource(R.string.quiz_loader_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // ── Info pills ────────────────────────────────────────
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                NetworkLoaderPill(text = "10 Questions")
-                NetworkLoaderPill(text = "~2 Minutes")
-            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -107,7 +98,7 @@ fun NetworkLoaderScreen() {
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "Loading questions…",
+                text = stringResource(R.string.quiz_loader_loading),
                 style = MaterialTheme.typography.bodySmall,
                 color = TextMuted,
                 letterSpacing = 0.04.sp
@@ -116,23 +107,6 @@ fun NetworkLoaderScreen() {
     }
 }
 
-@Composable
-private fun NetworkLoaderPill(text: String) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(99.dp))
-            .background(SurfaceColor)
-            .border(1.dp, BorderColor, RoundedCornerShape(99.dp))
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.SemiBold,
-            color = TextSecondary
-        )
-    }
-}
 
 @Composable
 private fun AnimatedLoadingDots() {
@@ -188,7 +162,7 @@ private fun AnimatedLoadingDots() {
     }
 }
 
-@Preview(showBackground = true, showSystemUi = true)
+@Preview(showSystemUi = true)
 @Composable
 private fun SplashScreenPreview() {
     QuizAppTheme {
