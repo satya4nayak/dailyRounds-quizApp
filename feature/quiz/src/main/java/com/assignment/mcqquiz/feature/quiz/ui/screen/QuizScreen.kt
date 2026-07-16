@@ -180,32 +180,18 @@ fun QuizScreen(
             // ── Answer feedback banner ────────────────────────────
             if (state.isAnswerRevealed) {
                 val isCorrectAnswer = state.selectedOptionIndex == currentQuestion.correctOptionIndex
-                val skipped = state.selectedOptionIndex == null
-                val bannerBg = when {
-                    skipped -> SurfaceHi
-                    isCorrectAnswer -> Color(0x1A1DAA60)
-                    else -> Color(0x1AE84545)
-                }
-                val bannerBorder = when {
-                    skipped -> BorderColor
-                    isCorrectAnswer -> Color(0x661DAA60)
-                    else -> Color(0x66E84545)
-                }
-                val bannerIcon  = when { skipped -> "⏭️"; isCorrectAnswer -> "✅"; else -> "❌" }
-                val bannerTitle = when {
-                    skipped        -> stringResource(R.string.quiz_banner_skipped)
-                    isCorrectAnswer -> stringResource(R.string.quiz_banner_correct)
-                    else           -> stringResource(R.string.quiz_banner_incorrect)
-                }
-                val bannerSub   = when {
-                    skipped || isCorrectAnswer -> stringResource(R.string.quiz_banner_moving_next)
-                    else                       -> stringResource(R.string.quiz_banner_correct_above)
-                }
-                val bannerTitleColor = when {
-                    skipped -> TextSecondary
-                    isCorrectAnswer -> CorrectGreen
-                    else -> WrongRed
-                }
+                val bannerBg = if (isCorrectAnswer) Color(0x1A1DAA60) else Color(0x1AE84545)
+                val bannerBorder = if (isCorrectAnswer) Color(0x661DAA60) else Color(0x66E84545)
+                val bannerIcon  = if (isCorrectAnswer) "✅" else "❌"
+                val bannerTitle = if (isCorrectAnswer)
+                    stringResource(R.string.quiz_banner_correct)
+                else
+                    stringResource(R.string.quiz_banner_incorrect)
+                val bannerSub   = if (isCorrectAnswer)
+                    stringResource(R.string.quiz_banner_moving_next)
+                else
+                    stringResource(R.string.quiz_banner_correct_above)
+                val bannerTitleColor = if (isCorrectAnswer) CorrectGreen else WrongRed
 
                 Row(
                     modifier = Modifier

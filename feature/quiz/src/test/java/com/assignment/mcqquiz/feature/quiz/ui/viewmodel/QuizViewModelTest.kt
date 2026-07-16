@@ -568,7 +568,7 @@ class QuizViewModelTest {
         }
 
     @Test
-    fun `given streak already at 3, when 4th correct selected, then showStreakCelebration is true again`() =
+    fun `given streak already at 3, when 4th correct selected, then showStreakCelebration is false at streak 4`() =
         runTest(mainDispatcherRule.testScheduler) {
             coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 10)
             val vm = createViewModel()
@@ -579,7 +579,8 @@ class QuizViewModelTest {
                 advanceTimeBy(2_001L); advanceUntilIdle()
             }
             vm.handleEvent(QuizViewModel.Event.OptionSelected(0))
-            assertTrue(vm.uiState.value.showStreakCelebration)
+            // Celebration only triggers at exactly streak == 3; streak 4 does NOT re-trigger it
+            assertFalse(vm.uiState.value.showStreakCelebration)
             assertEquals(4, vm.uiState.value.currentStreak)
         }
 
@@ -694,7 +695,7 @@ class QuizViewModelTest {
     // =========================================================================
 
     @Test
-    fun `given loaded quiz, when SkipQuestion fired, then skippedCount increments immediately`() =
+    fun `given loaded quiz, when SkipQuestion fired, then skippedCount increments`() =
         runTest(mainDispatcherRule.testScheduler) {
             val vm = createViewModel()
             vm.handleEvent(QuizViewModel.Event.InitialLoad)
@@ -704,62 +705,93 @@ class QuizViewModelTest {
         }
 
     @Test
-    fun `given loaded quiz, when SkipQuestion fired, then isAnswerRevealed is true immediately`() =
+    fun `given loaded quiz, when SkipQuestion fired, then index advances immediately without delay`() =
         runTest(mainDispatcherRule.testScheduler) {
             val vm = createViewModel()
             vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
             vm.handleEvent(QuizViewModel.Event.SkipQuestion)
-            assertTrue(vm.uiState.value.isAnswerRevealed)
-        }
-
-    @Test
-    fun `given loaded quiz, when SkipQuestion fired, then selectedOptionIndex is null`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            val vm = createViewModel()
-            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            // No time advancement needed — skip is immediate
             advanceUntilIdle()
-            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
-            assertNull(vm.uiState.value.selectedOptionIndex)
-        }
-
-    @Test
-    fun `given loaded quiz, when SkipQuestion fired and 2s pass, then index advances to 1`() =
-        runTest(mainDispatcherRule.testScheduler) {
-            val vm = createViewModel()
-            vm.handleEvent(QuizViewModel.Event.InitialLoad)
-            advanceUntilIdle()
-            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
-            advanceTimeBy(2_001L); advanceUntilIdle()
             assertEquals(1, vm.uiState.value.currentQuestionIndex)
         }
 
     @Test
-    fun `given 2-question quiz, when both questions skipped with delays, then NavigateToResults emitted`() =
+    fun `given loaded quiz, when SkipQuestion fired, then isAnswerRevealed stays false`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
+            advanceUntilIdle()
+            // Skip does NOT reveal the answer — question just moves on
+            assertFalse(vm.uiState.value.isAnswerRevealed)
+        }
+
+    @Test
+    fun `given loaded quiz, when SkipQuestion fired, then selectedOptionIndex stays null`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
+            advanceUntilIdle()
+            assertNull(vm.uiState.value.selectedOptionIndex)
+        }
+
+    @Test
+    fun `given 2-question quiz, when both skipped, then NavigateToResults emitted immediately`() =
         runTest(mainDispatcherRule.testScheduler) {
             coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 2)
             val vm = createViewModel()
             vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
-            // Skip Q1
-            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
-            advanceTimeBy(2_001L); advanceUntilIdle()
-            // Skip Q2
-            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
-            advanceTimeBy(2_001L); advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion) // immediately advances to Q2
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion) // immediately goes to results
+            advanceUntilIdle()
             assertEquals(QuizViewModel.Effect.NavigateToResults, vm.effects.replayCache.firstOrNull())
         }
 
     @Test
-    fun `given skipped question, when 2s pass, then isAnswerRevealed resets to false`() =
+    fun `given 3 questions, when 2 skipped, then skippedCount is 2 and index is 2`() =
         runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 3)
             val vm = createViewModel()
             vm.handleEvent(QuizViewModel.Event.InitialLoad)
             advanceUntilIdle()
             vm.handleEvent(QuizViewModel.Event.SkipQuestion)
-            assertTrue(vm.uiState.value.isAnswerRevealed)
-            advanceTimeBy(2_001L); advanceUntilIdle()
-            assertFalse(vm.uiState.value.isAnswerRevealed)
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
+            advanceUntilIdle()
+            assertEquals(2, vm.uiState.value.skippedCount)
+            assertEquals(2, vm.uiState.value.currentQuestionIndex)
+        }
+
+    @Test
+    fun `given pending auto-advance from option selection, when SkipQuestion fired, then auto-advance is cancelled`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 5)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.OptionSelected(0)) // answer Q1, schedules 2s auto-advance
+            assertEquals(0, vm.uiState.value.currentQuestionIndex)
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion) // cancels pending advance, advances immediately
+            advanceUntilIdle()
+            // Skip advanced from Q1 (index 0) to Q2 (index 1).
+            // The previously scheduled 2s auto-advance was cancelled so no double-advance.
+            assertEquals(1, vm.uiState.value.currentQuestionIndex)
+        }
+
+    @Test
+    fun `given 1-question quiz, when skipped, then NavigateToResults is emitted`() =
+        runTest(mainDispatcherRule.testScheduler) {
+            coEvery { quizService.loadQuestions(any()) } returns buildQuestions(count = 1)
+            val vm = createViewModel()
+            vm.handleEvent(QuizViewModel.Event.InitialLoad)
+            advanceUntilIdle()
+            vm.handleEvent(QuizViewModel.Event.SkipQuestion)
+            advanceUntilIdle()
+            assertEquals(QuizViewModel.Effect.NavigateToResults, vm.effects.replayCache.firstOrNull())
         }
 
     // =========================================================================

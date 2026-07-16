@@ -55,6 +55,12 @@ class QuizUiStateTest {
     }
 
     @Test
+    fun `given default state, when allTimeLongestStreak is accessed, then it is 0`() {
+        val state = QuizUiState()
+        assertEquals(0, state.allTimeLongestStreak)
+    }
+
+    @Test
     fun `given default state, when showStreakCelebration is accessed, then it is false`() {
         val state = QuizUiState()
         assertFalse(state.showStreakCelebration)
@@ -135,5 +141,37 @@ class QuizUiStateTest {
         val s1 = QuizUiState(currentQuestionIndex = 0)
         val s2 = QuizUiState(currentQuestionIndex = 1)
         assertTrue(s1 != s2)
+    }
+
+    // ─── allTimeLongestStreak ─────────────────────────────────────────────────
+
+    @Test
+    fun `given state with allTimeLongestStreak 5, when accessed, then it is 5`() {
+        val state = QuizUiState(allTimeLongestStreak = 5)
+        assertEquals(5, state.allTimeLongestStreak)
+    }
+
+    @Test
+    fun `given state copied with new allTimeLongestStreak, then only that field changes`() {
+        val base = QuizUiState(allTimeLongestStreak = 3, longestStreak = 3, currentStreak = 2)
+        val updated = base.copy(allTimeLongestStreak = 7)
+        assertEquals(7, updated.allTimeLongestStreak)
+        assertEquals(3, updated.longestStreak)
+        assertEquals(2, updated.currentStreak)
+    }
+
+    @Test
+    fun `given two states differing only in allTimeLongestStreak, when compared, they are not equal`() {
+        val s1 = QuizUiState(allTimeLongestStreak = 3)
+        val s2 = QuizUiState(allTimeLongestStreak = 7)
+        assertTrue(s1 != s2)
+    }
+
+    @Test
+    fun `given state with allTimeLongestStreak greater than longestStreak, when accessed, then both values are independent`() {
+        // allTimeLongestStreak is from a previous session; longestStreak is the current attempt
+        val state = QuizUiState(longestStreak = 2, allTimeLongestStreak = 10)
+        assertEquals(2, state.longestStreak)
+        assertEquals(10, state.allTimeLongestStreak)
     }
 }

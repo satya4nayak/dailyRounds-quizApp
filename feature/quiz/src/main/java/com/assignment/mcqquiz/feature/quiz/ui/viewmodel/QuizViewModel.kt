@@ -202,17 +202,9 @@ class QuizViewModel(
 
     private fun onSkip() {
         autoAdvanceJob?.cancel()
-        _uiState.update {
-            it.copy(
-                skippedCount = it.skippedCount + 1,
-                isAnswerRevealed = true,   // triggers the skip banner
-                selectedOptionIndex = null // null = "skipped" sentinel for banner
-            )
-        }
-        autoAdvanceJob = viewModelScope.launch {
-            delay(AUTO_ADVANCE_DELAY_MS)
-            advanceToNextQuestion()
-        }
+        // Increment skip counter then move on immediately — no answer reveal, no delay.
+        _uiState.update { it.copy(skippedCount = it.skippedCount + 1) }
+        advanceToNextQuestion()
     }
 
     private fun onFinish() {
